@@ -1,0 +1,92 @@
+import 'enums.dart';
+
+/// A single income or expense.
+///
+/// [amount] is in the entry's own [currency]. [fxRate] converts it to the
+/// user's home currency ([homeCurrency] at the time the rate was set), so
+/// reports never shift when exchange rates move later.
+class Entry {
+  const Entry({
+    this.id,
+    required this.kind,
+    required this.amount,
+    required this.currency,
+    required this.homeCurrency,
+    this.fxRate,
+    required this.categoryId,
+    required this.date,
+    this.note = '',
+    this.source = EntrySource.manual,
+  });
+
+  final int? id;
+  final EntryKind kind;
+  final double amount;
+  final String currency;
+  final String homeCurrency;
+
+  /// Null when the entry is in a foreign currency and no rate is known yet.
+  final double? fxRate;
+  final int categoryId;
+  final DateTime date;
+  final String note;
+  final EntrySource source;
+
+  bool get needsRate => fxRate == null;
+
+  /// Amount in the home currency, or null while the rate is missing.
+  double? get homeAmount => fxRate == null ? null : amount * fxRate!;
+
+  Entry copyWith({
+    EntryKind? kind,
+    double? amount,
+    String? currency,
+    String? homeCurrency,
+    double? Function()? fxRate,
+    int? categoryId,
+    DateTime? date,
+    String? note,
+  }) =>
+      Entry(
+        id: id,
+        kind: kind ?? this.kind,
+        amount: amount ?? this.amount,
+        currency: currency ?? this.currency,
+        homeCurrency: homeCurrency ?? this.homeCurrency,
+        fxRate: fxRate != null ? fxRate() : this.fxRate,
+        categoryId: categoryId ?? this.categoryId,
+        date: date ?? this.date,
+        note: note ?? this.note,
+        source: source,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'kind': kind.name,
+        'amount': amount,
+        'currency': currency,
+        'home_currency': homeCurrency,
+        'fx_rate': fxRate,
+        'category_id': categoryId,
+        'date': dateKey(date),
+        'note': note,
+        'source': source.name,
+      };
+
+  factory Entry.fromMap(Map<String, Object?> m) => Entry(
+        id: m['id'] as int,
+        kind: EntryKind.fromName(m['kind'] as String),
+        amount: (m['amount'] as num).toDouble(),
+        currency: m['currency'] as String,
+        homeCurrency: m['home_currency'] as String,
+        fxRate: (m['fx_rate'] as num?)?.toDouble(),
+        categoryId: m['category_id'] as int,
+        date: DateTime.parse(m['date'] as String),
+        note: m['note'] as String,
+        source: EntrySource.fromName(m['source'] as String),
+      );
+}
+
+/// Dates are stored as yyyy-MM-dd so they sort and compare as text.
+String dateKey(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
