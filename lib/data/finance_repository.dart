@@ -1,9 +1,12 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../import/parsed_transaction.dart';
+import '../import/pending_import.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../models/entry_filter.dart';
 import '../models/enums.dart';
+import '../services/analytics.dart';
 import 'app_database.dart';
 
 class FinanceRepository {
@@ -142,4 +145,43 @@ class FinanceRepository {
         {'date': date, 'from_currency': from, 'to_currency': to, 'rate': rate},
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+
+  // Import inbox
+
+  /// Adds parsed transactions to the inbox, skipping ones already seen.
+  /// Returns how many were new.
+  Future<int> addImports(Iterable<ParsedTransaction> items) async {
+    var added = 0;
+    await _db.transaction((txn) async {
+      for (final t in items) {
+        final id = await txn.insert('imports', PendingImport.toRow(t), conflictAlgorithm: ConflictAlgorithm.ignore);
+        if (id > 0) added++;
+      }
+    });
+    return added;
+  }
+
+  Future<List<PendingImport>> pendingImports() async {
+    final rows = await _db.query('imports', where: "status = 'pending'", orderBy: 'date DESC, id DESC');
+    return rows.map(PendingImport.fromMap).toList();
+  }
+
+  Future<int> pendingImportCount() async =>
+      Sqflite.firstIntValue(await _db.rawQuery("SELECT COUNT(*) FROM imports WHERE status = 'pending'")) ?? 0;
+
+  /// Saves [entry] and marks the import accepted in one transaction.
+  Future<void> acceptImport(int importId, Entry entry) => _db.transaction((txn) async {
+        final id = await txn.insert('entries', entry.toMap()..remove('id'));
+        await txn.update('imports', {'status': 'accepted', 'entry_id': id}, where: 'id = ?', whereArgs: [importId]);
+      });
+
+  Future<void> ignoreImport(int importId) =>
+      _db.update('imports', {'status': 'ignored'}, where: 'id = ?', whereArgs: [importId]);
+
+  /// Normalized note -> the category most recently used with it, so imports
+  /// from a known merchant land in the same type as before.
+  Future<Map<String, int>> noteCategoryHistory() async {
+    final rows = await _db.query('entries', columns: ['note', 'category_id'], where: "note != ''", orderBy: 'date ASC, id ASC');
+    return {for (final r in rows) normalizeNote(r['note'] as String): r['category_id'] as int};
+  }
 }

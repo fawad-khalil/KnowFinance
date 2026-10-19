@@ -9,7 +9,7 @@ class AppDatabase {
 
   final Database db;
 
-  static const _version = 1;
+  static const _version = 2;
 
   /// Opens the on-device database. [factory] and [path] let tests use an
   /// in-memory database through sqflite_common_ffi.
@@ -25,6 +25,7 @@ class AppDatabase {
         version: _version,
         onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: _create,
+        onUpgrade: _upgrade,
       ),
     );
     return AppDatabase._(db);
@@ -62,11 +63,39 @@ class AppDatabase {
         PRIMARY KEY (date, from_currency, to_currency)
       )''');
 
+    await _createImports(db);
+
     final batch = db.batch();
     for (final c in defaultCategories) {
       batch.insert('categories', c.toMap()..remove('id'));
     }
     await batch.commit(noResult: true);
+  }
+
+  static Future<void> _upgrade(Database db, int from, int to) async {
+    if (from < 2) await _createImports(db);
+  }
+
+  /// Transactions read from SMS, email or statements wait here until the
+  /// user accepts or ignores them. The unique fingerprint stops the same
+  /// message being imported twice.
+  static Future<void> _createImports(Database db) async {
+    await db.execute('''
+      CREATE TABLE imports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fingerprint TEXT NOT NULL UNIQUE,
+        source TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL,
+        date TEXT NOT NULL,
+        counterparty TEXT NOT NULL DEFAULT '',
+        bank TEXT,
+        raw TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        entry_id INTEGER REFERENCES entries(id) ON DELETE SET NULL
+      )''');
+    await db.execute('CREATE INDEX imports_status ON imports(status)');
   }
 
   Future<void> close() => db.close();
