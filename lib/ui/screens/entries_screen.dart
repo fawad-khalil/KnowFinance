@@ -8,6 +8,7 @@ import '../../models/enums.dart';
 import '../../state/providers.dart';
 import '../widgets/filter_bar.dart';
 import 'entry_form_screen.dart';
+import 'import_screen.dart';
 
 class EntriesScreen extends ConsumerWidget {
   const EntriesScreen({super.key});
@@ -15,8 +16,22 @@ class EntriesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = ref.watch(entriesProvider);
+    final toReview = ref.watch(pendingImportCountProvider).value ?? 0;
     return Scaffold(
-      appBar: AppBar(title: const Text('KnowFinance')),
+      appBar: AppBar(
+        title: const Text('KnowFinance'),
+        actions: [
+          IconButton(
+            tooltip: 'Import transactions',
+            onPressed: () => ImportScreen.open(context),
+            icon: Badge(
+              isLabelVisible: toReview > 0,
+              label: Text('$toReview'),
+              child: const Icon(Icons.move_to_inbox_outlined),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => EntryFormScreen.open(context),
         icon: const Icon(Icons.add),

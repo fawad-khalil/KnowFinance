@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/currency.dart';
 import '../../state/providers.dart';
 import 'categories_screen.dart';
+import 'import_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -49,6 +50,12 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Text('Lists, charts and reports are shown in ${currencyFor(home).name}'),
             trailing: Text(home, style: Theme.of(context).textTheme.titleMedium),
             onTap: () => _pickCurrency(context, ref, home),
+          ),
+          ListTile(
+            leading: const Icon(Icons.move_to_inbox_outlined),
+            title: const Text('Import transactions'),
+            subtitle: const Text('From bank SMS, pasted emails or CSV statements'),
+            onTap: () => ImportScreen.open(context),
           ),
           ListTile(
             leading: const Icon(Icons.category_outlined),
