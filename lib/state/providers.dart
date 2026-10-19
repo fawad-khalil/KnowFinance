@@ -3,6 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_database.dart';
 import '../data/finance_repository.dart';
+import '../import/category_suggester.dart';
+import '../import/import_service.dart';
+import '../import/pending_import.dart';
 import '../models/category.dart';
 import '../models/currency.dart';
 import '../models/entry.dart';
@@ -92,3 +95,26 @@ final insightsEntriesProvider = FutureProvider<List<Entry>>((ref) {
   final f = ref.watch(filterProvider);
   return ref.watch(repositoryProvider).entries(EntryFilter(preset: f.preset, range: f.range));
 });
+
+final pendingImportsProvider = FutureProvider<List<PendingImport>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).pendingImports();
+});
+
+final pendingImportCountProvider = FutureProvider<int>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).pendingImportCount();
+});
+
+/// Suggests a type for each import using the user's own history.
+final categorySuggesterProvider = FutureProvider<CategorySuggester>((ref) async {
+  ref.watch(dataVersionProvider);
+  final repo = ref.watch(repositoryProvider);
+  return CategorySuggester(await repo.categories(), await repo.noteCategoryHistory());
+});
+
+final importServiceProvider = Provider<ImportService>((ref) => ImportService(
+      ref.watch(repositoryProvider),
+      ref.watch(fxServiceProvider),
+      ref.watch(preferencesProvider),
+    ));
