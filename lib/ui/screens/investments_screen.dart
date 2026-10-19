@@ -252,7 +252,7 @@ class _SummaryCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               '${s.unvalued} open ${s.unvalued == 1 ? 'holding has' : 'holdings have'} no current value and '
-              "${s.unvalued == 1 ? "isn't" : "aren't"} counted. Open it and set what it's worth today.",
+              "${s.unvalued == 1 ? "isn't" : "aren't"} counted. Open it to set its value, or the quantities for a priced asset.",
               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
             ),
           ],
@@ -323,7 +323,7 @@ class _HoldingTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            profit == null ? 'Set value' : signedMoney(profit, home, compact: true),
+            profit == null ? (h.investment.priceSymbol != null ? 'Add quantity' : 'Set value') : signedMoney(profit, home, compact: true),
             style: theme.textTheme.titleSmall?.copyWith(
               color: profit == null ? theme.colorScheme.error : plColor(context, profit),
               fontWeight: FontWeight.w600,

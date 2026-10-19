@@ -101,7 +101,9 @@ class InvestmentDetailScreen extends ConsumerWidget {
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            profit == null ? 'Needs a current value' : signedMoney(profit, home),
+                            profit == null
+                                ? (inv.priceSymbol != null ? 'Link a buy with its quantity' : 'Needs a current value')
+                                : signedMoney(profit, home),
                             style: theme.textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                               color: profit == null ? theme.colorScheme.error : plColor(context, profit),
@@ -125,7 +127,8 @@ class InvestmentDetailScreen extends ConsumerWidget {
                       if (h.first != null) StatTile(label: 'Held', value: _heldFor(h.first!, inv.closed ? h.last! : DateTime.now())),
                     ],
                   ),
-                  if (!inv.closed && h.marketValue(home) == null) ...[
+                  // Priced assets are valued from the market once quantities are in.
+                  if (!inv.closed && h.marketValue(home) == null && inv.priceSymbol == null) ...[
                     const Divider(height: 32),
                     Row(
                       children: [
