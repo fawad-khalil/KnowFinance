@@ -9,14 +9,23 @@ import '../../state/providers.dart';
 /// Date range, income/expense, bucket and note search controls shared by the
 /// entries list and (later) the insights screen.
 class FilterBar extends ConsumerStatefulWidget {
-  const FilterBar({super.key});
+  const FilterBar({super.key, this.datesOnly = false});
+
+  /// Insights only follows the date range, so it hides the other controls.
+  final bool datesOnly;
 
   @override
   ConsumerState<FilterBar> createState() => _FilterBarState();
 }
 
 class _FilterBarState extends ConsumerState<FilterBar> {
-  late final _search = TextEditingController(text: ref.read(filterProvider).noteQuery);
+  late final TextEditingController _search;
+
+  @override
+  void initState() {
+    super.initState();
+    _search = TextEditingController(text: ref.read(filterProvider).noteQuery);
+  }
 
   @override
   void dispose() {
@@ -59,7 +68,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
+          if (!widget.datesOnly) TextField(
             controller: _search,
             decoration: InputDecoration(
               hintText: 'Search notes',
@@ -78,7 +87,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
             ),
             onChanged: (v) => notifier.update((f) => f.copyWith(noteQuery: v)),
           ),
-          const SizedBox(height: 8),
+          if (!widget.datesOnly) const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -94,7 +103,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                for (final k in [null, EntryKind.income, EntryKind.expense]) ...[
+                if (!widget.datesOnly) for (final k in [null, EntryKind.income, EntryKind.expense]) ...[
                   ChoiceChip(
                     label: Text(k == null ? 'All' : (k == EntryKind.income ? 'Income' : 'Expenses')),
                     selected: filter.kind == k,
@@ -105,7 +114,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                   ),
                   const SizedBox(width: 6),
                 ],
-                if (filter.kind != EntryKind.income)
+                if (!widget.datesOnly && filter.kind != EntryKind.income)
                   for (final b in Bucket.values) ...[
                     FilterChip(
                       label: Text(b.label),
