@@ -118,3 +118,9 @@ final importServiceProvider = Provider<ImportService>((ref) => ImportService(
       ref.watch(fxServiceProvider),
       ref.watch(preferencesProvider),
     ));
+
+/// Every entry, for year-by-year reports.
+final allEntriesProvider = FutureProvider<List<Entry>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).entries(const EntryFilter(preset: DatePreset.allTime));
+});
