@@ -21,19 +21,63 @@ final investmentAnalyticsProvider = Provider<AsyncValue<InvestmentAnalytics>>((r
   return AsyncValue.data(InvestmentAnalytics(inv.value!, linked.value!, home));
 });
 
-class InvestmentsScreen extends ConsumerWidget {
+class InvestmentsScreen extends ConsumerStatefulWidget {
   const InvestmentsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InvestmentsScreen> createState() => _InvestmentsScreenState();
+}
+
+class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
+  var _refreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Prices are fetched at most once a day unless refreshed by hand.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh(force: false));
+  }
+
+  Future<void> _refresh({required bool force}) async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    final updated = await ref.read(priceServiceProvider).refresh(ref.read(homeCurrencyProvider), force: force);
+    if (!mounted) return;
+    setState(() => _refreshing = false);
+    if (updated > 0) ref.read(dataVersionProvider.notifier).bump();
+    if (force) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(updated > 0
+            ? 'Updated ${updated == 1 ? '1 price' : '$updated prices'}.'
+            : 'No prices updated. Check your connection, or add a price feed to an asset.'),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final analytics = ref.watch(investmentAnalyticsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Investments')),
+      appBar: AppBar(
+        title: const Text('Assets & investments'),
+        actions: [
+          _refreshing
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              : IconButton(
+                  tooltip: 'Refresh market prices',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => _refresh(force: true),
+                ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'add-investment',
         onPressed: () => InvestmentFormSheet.open(context),
         icon: const Icon(Icons.add),
-        label: const Text('Investment'),
+        label: const Text('Asset'),
       ),
       body: analytics.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -58,11 +102,12 @@ class _Empty extends StatelessWidget {
           children: [
             Icon(Icons.trending_up, size: 48, color: theme.colorScheme.primary),
             const SizedBox(height: 16),
-            Text('Track what your investments earn', style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
+            Text('Track your assets and what they earn', style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
-              'Add a stock, fund, plot or anything else you put money into. Then link the expenses that bought '
-              'it and the income it brought back (sales, dividends, rent) to see your profit or loss.',
+              'Add gold, silver, oil, crypto, stocks, a plot or anything else you own. Link the expenses that bought '
+              'it and the income it brought back (sales, dividends, rent) to see your profit or loss. Gold, silver, '
+              'oil and crypto are valued at today\'s market price.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),
@@ -101,6 +146,15 @@ class _Portfolio extends StatelessWidget {
               ),
               currency: a.home,
               centerLabel: 'Invested',
+            ),
+          ),
+        if (open.any((h) => h.priceChange(a.home) != null))
+          _Card(
+            title: 'Purchase vs market',
+            child: Column(
+              children: [
+                for (final h in open.where((h) => h.priceChange(a.home) != null)) _MarketRow(holding: h, home: a.home),
+              ],
             ),
           ),
         if (open.isNotEmpty) _HoldingList(title: 'Open', holdings: open, home: a.home),
@@ -237,8 +291,10 @@ class _HoldingTile extends StatelessWidget {
     final profit = h.profit(home);
     final roi = h.roi(home);
     final value = h.valueIn(home);
+    final unit = h.investment.unit;
     final sub = [
       h.investment.type.label,
+      if (h.tracksQuantity && unit != null) '${formatQuantity(h.held)} ${unit.label}',
       'in ${compactMoney(h.invested, home)}',
       if (h.returned > 0) 'back ${compactMoney(h.returned, home)}',
       if (!h.investment.closed && value != null) 'worth ${compactMoney(value, home)}',
@@ -271,13 +327,89 @@ class _HoldingTile extends StatelessWidget {
   }
 }
 
+/// Average price paid per unit next to today's market price, with bars for
+/// what the units held cost and what they are worth now.
+class _MarketRow extends StatelessWidget {
+  const _MarketRow({required this.holding, required this.home});
+
+  final Holding holding;
+  final String home;
+
+  @override
+  Widget build(BuildContext context) {
+    final h = holding;
+    final theme = Theme.of(context);
+    final unit = h.investment.unit!.label;
+    final change = h.priceChange(home)!;
+    final cost = h.costOfHeld ?? 0, value = h.marketValue(home) ?? 0;
+    final max = cost > value ? cost : value;
+    final colors = ChartColors.of(context);
+    Widget bar(String label, double v, Color c) => Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Row(
+            children: [
+              SizedBox(width: 64, child: Text(label, style: theme.textTheme.labelSmall)),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: max <= 0 ? 0 : v / max,
+                    minHeight: 10,
+                    color: c,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 84,
+                child: Text(compactMoney(v, home), textAlign: TextAlign.right, style: theme.textTheme.labelMedium),
+              ),
+            ],
+          ),
+        );
+    return InkWell(
+      onTap: () => InvestmentDetailScreen.open(context, h.investment.id!),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(h.investment.name, style: theme.textTheme.titleSmall)),
+                ChangeChip(value: change * 100),
+              ],
+            ),
+            Text(
+              'Paid ${formatMoney(h.avgBuyPrice!.roundToDouble(), home)}/$unit · '
+              'market ${formatMoney(h.marketPrice(home)!.roundToDouble(), home)}/$unit',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            bar('Cost', cost, colors.other),
+            bar('Market', value, plColor(context, value - cost)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // Shared bits used by the detail screen too.
+
+/// "2", "2.5" or "0.125": up to four decimals, no trailing zeros.
+String formatQuantity(double q) {
+  final s = q.toStringAsFixed(4);
+  return s.contains('.') ? s.replaceFirst(RegExp(r'\.?0+$'), '') : s;
+}
 
 IconData assetIcon(AssetType t) => switch (t) {
       AssetType.stocks => Icons.candlestick_chart_outlined,
       AssetType.fund => Icons.pie_chart_outline,
       AssetType.property => Icons.home_work_outlined,
       AssetType.gold => Icons.diamond_outlined,
+      AssetType.silver => Icons.diamond_outlined,
+      AssetType.commodity => Icons.oil_barrel_outlined,
+      AssetType.vehicle => Icons.directions_car_outlined,
       AssetType.crypto => Icons.currency_bitcoin,
       AssetType.deposit => Icons.savings_outlined,
       AssetType.business => Icons.storefront_outlined,

@@ -31,19 +31,31 @@ Insights (follows the selected date range):
 - Income vs expenses line chart, and income vs Needs, Wants and Savings
 - Spending grouped by note (case-insensitive, extra spaces ignored)
 
-Investments (Invest tab):
+Assets & investments (Assets tab):
 
-- Add a holding (stocks, mutual fund, property, gold, crypto, savings
-  scheme, business, other) and link entries to it: expenses as Buy or Cost
-  (fees, tax, upkeep), income as Sale or Dividend / rent
-- Link from the entry form (an investment whose name the note mentions is
-  picked automatically) or from the holding's page, which lists unlinked
-  Savings expenses and income with matching notes already ticked
-- Per holding: invested, cash returned, current value, profit or loss, ROI,
-  income yield, annualised return (XIRR) and how long it has been held
-- Portfolio totals and a split of money invested by type. Open holdings
-  need a current value (Update on their page) to count towards profit;
-  closed ones don't
+- Track anything you own or invested in: stocks, mutual funds, property,
+  gold, silver, other commodities, crypto, savings schemes, a business, a
+  vehicle. Link entries to it: expenses as Buy or Cost (fees, tax, upkeep),
+  income as Sale or Dividend / rent
+- Link from the entry form (an asset whose name the note mentions is picked
+  automatically) or from the asset's page, which lists unlinked Savings
+  expenses and income with matching notes already ticked
+- Assets can be counted in grams, tola, troy ounces, kg, lb, barrels,
+  shares, coins or units. Buys and sales record a quantity, read from the
+  note when it says e.g. "Gold 2 tola" or "10g"
+- Market prices: gold, silver, platinum and palladium (XAU, XAG, XPT, XPD),
+  Bitcoin and Ethereum come from the currency API, converted from troy
+  ounces to the unit you hold. WTI and Brent crude oil, copper and any stock
+  or ETF ticker come from Yahoo Finance. Prices refresh once a day when the
+  tab opens, or on demand with the refresh button
+- Purchase vs market: average price paid per unit against today's price,
+  cost of what you still hold against its market value, gain on units sold,
+  and for metals and crypto each buy against the market price on its own
+  day (the premium a jeweller or exchange charged)
+- Per asset: invested, cash returned, current value (market value when
+  priced, otherwise typed in), profit or loss, ROI, income yield,
+  annualised return (XIRR) and how long it has been held
+- Portfolio totals and a split of money invested by type
 
 Reports:
 
@@ -83,7 +95,7 @@ flutter run            # with a phone or emulator connected
 flutter test
 ```
 
-To render the Insights, Invest and Reports screens to PNGs with sample data:
+To render the Insights, Assets (list and the gold page) and Reports screens to PNGs with sample data:
 
 ```sh
 FLUTTER_ROOT=<flutter sdk> SCREENSHOT_DIR=/tmp/shots flutter test test/ui/screenshots_test.dart --update-goldens

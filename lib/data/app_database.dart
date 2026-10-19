@@ -9,7 +9,7 @@ class AppDatabase {
 
   final Database db;
 
-  static const _version = 3;
+  static const _version = 4;
 
   /// Opens the on-device database. [factory] and [path] let tests use an
   /// in-memory database through sqflite_common_ffi.
@@ -65,6 +65,7 @@ class AppDatabase {
 
     await _createImports(db);
     await _createInvestments(db);
+    await _addQuantities(db);
 
     final batch = db.batch();
     for (final c in defaultCategories) {
@@ -76,6 +77,22 @@ class AppDatabase {
   static Future<void> _upgrade(Database db, int from, int to) async {
     if (from < 2) await _createImports(db);
     if (from < 3) await _createInvestments(db);
+    if (from < 4) await _addQuantities(db);
+  }
+
+  /// Assets counted by amount held (grams, shares, barrels) and priced from
+  /// a market feed; entries record how much they bought or sold.
+  static Future<void> _addQuantities(Database db) async {
+    for (final col in [
+      'unit TEXT',
+      'price_symbol TEXT',
+      'market_price REAL',
+      'market_currency TEXT',
+      'market_price_on TEXT',
+    ]) {
+      await db.execute('ALTER TABLE investments ADD COLUMN $col');
+    }
+    await db.execute('ALTER TABLE entries ADD COLUMN quantity REAL');
   }
 
   /// Holdings that entries can be linked to, so buys and costs can be set

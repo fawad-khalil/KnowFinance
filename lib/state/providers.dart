@@ -12,6 +12,7 @@ import '../models/entry.dart';
 import '../models/entry_filter.dart';
 import '../models/investment.dart';
 import '../services/fx_service.dart';
+import '../services/price_service.dart';
 
 /// Overridden in main() once the database is open.
 final appDatabaseProvider = Provider<AppDatabase>(
@@ -27,6 +28,9 @@ final repositoryProvider =
     Provider<FinanceRepository>((ref) => FinanceRepository(ref.watch(appDatabaseProvider)));
 
 final fxServiceProvider = Provider<FxService>((ref) => FxService(ref.watch(repositoryProvider)));
+
+final priceServiceProvider =
+    Provider<PriceService>((ref) => PriceService(ref.watch(repositoryProvider), ref.watch(fxServiceProvider)));
 
 class HomeCurrencyNotifier extends Notifier<String> {
   static const _key = 'home_currency';

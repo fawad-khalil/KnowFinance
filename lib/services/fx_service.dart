@@ -26,7 +26,10 @@ class FxService {
 
     final base = from.toLowerCase();
     final quote = to.toLowerCase();
-    for (final url in _urls(day, base)) {
+    // Today's file is published some hours into the day; until then the
+    // most recent one is the best rate there is.
+    final recent = DateTime.now().difference(_notInFuture(date)).inDays < 2;
+    for (final url in [..._urls(day, base), if (recent) ..._urls('latest', base)]) {
       try {
         final res = await _client.get(url).timeout(const Duration(seconds: 8));
         if (res.statusCode != 200) continue;

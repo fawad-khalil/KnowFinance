@@ -9,6 +9,8 @@ import '../../models/entry.dart';
 import '../../models/enums.dart';
 import '../../models/investment.dart';
 import '../../services/investment_analytics.dart';
+import '../../services/price_service.dart';
+import 'investments_screen.dart' show formatQuantity;
 import '../../state/providers.dart';
 
 class EntryFormScreen extends ConsumerStatefulWidget {
@@ -39,6 +41,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   final _amount = TextEditingController();
   final _rate = TextEditingController();
   final _note = TextEditingController();
+  final _qty = TextEditingController();
   final _noteFocus = FocusNode();
   var _fetchingRate = false;
   var _saving = false;
@@ -56,6 +59,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     _investmentId = e?.investmentId;
     _flow = e?.investmentFlow;
     _investmentTouched = e?.investmentId != null;
+    if (e?.quantity != null) _qty.text = formatQuantity(e!.quantity!);
     if (e != null) {
       _amount.text = _plain(e.amount);
       _note.text = e.note;
@@ -71,6 +75,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     _amount.dispose();
     _rate.dispose();
     _note.dispose();
+    _qty.dispose();
     _noteFocus.dispose();
     super.dispose();
   }
@@ -78,6 +83,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   /// Links the entry to an investment whose name its note mentions, until
   /// the user picks one themselves.
   void _suggestInvestment() {
+    _suggestQuantity();
     if (_investmentTouched) return;
     final list = ref.read(investmentsProvider).value ?? const <Investment>[];
     final match = list.where((i) => !i.closed && noteMatchesInvestment(_note.text, i.name)).firstOrNull;
@@ -87,6 +93,20 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
       _flow = match == null ? null : InvestmentFlow.defaultFor(_kind);
     });
   }
+
+  Investment? get _investment =>
+      (ref.read(investmentsProvider).value ?? const <Investment>[]).where((i) => i.id == _investmentId).firstOrNull;
+
+  /// Fills the quantity from a note like "Gold 2 tola" while it's empty.
+  void _suggestQuantity() {
+    final unit = _investment?.unit;
+    if (unit == null || _qtyTouched) return;
+    final q = quantityFromNote(_note.text, unit);
+    final text = q == null ? '' : formatQuantity(q);
+    if (_qty.text != text) _qty.text = text;
+  }
+
+  var _qtyTouched = false;
 
   static String _plain(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
@@ -133,6 +153,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
       source: base?.source ?? EntrySource.manual,
       investmentId: _investmentId,
       investmentFlow: _investmentId == null ? null : (_flow ?? InvestmentFlow.defaultFor(_kind)),
+      quantity: _investment?.unit == null ? null : double.tryParse(_qty.text),
     );
     await ref.read(repositoryProvider).saveEntry(entry);
     ref.read(dataVersionProvider.notifier).bump();
@@ -278,11 +299,14 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                     if (!i.closed || i.id == _investmentId)
                       DropdownMenuItem<int?>(value: i.id, child: Text('${i.name}  ·  ${i.type.label}')),
                 ],
-                onChanged: (v) => setState(() {
-                  _investmentTouched = true;
-                  _investmentId = v;
-                  _flow = v == null ? null : (_flow ?? InvestmentFlow.defaultFor(_kind));
-                }),
+                onChanged: (v) {
+                  setState(() {
+                    _investmentTouched = true;
+                    _investmentId = v;
+                    _flow = v == null ? null : (_flow ?? InvestmentFlow.defaultFor(_kind));
+                  });
+                  _suggestQuantity();
+                },
               ),
               if (_investmentId != null) ...[
                 const SizedBox(height: 8),
@@ -297,6 +321,25 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                       ),
                   ],
                 ),
+                if (_investment?.unit != null &&
+                    (_flow ?? InvestmentFlow.defaultFor(_kind)) != InvestmentFlow.cost &&
+                    (_flow ?? InvestmentFlow.defaultFor(_kind)) != InvestmentFlow.income) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _qty,
+                    decoration: InputDecoration(
+                      labelText: 'Quantity',
+                      suffixText: _investment!.unit!.label,
+                      helperText: 'How much this bought or sold. Read from the note when it says e.g. "2 tola".',
+                      helperMaxLines: 2,
+                      border: const OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                    onChanged: (_) => _qtyTouched = true,
+                    validator: (v) => (v ?? '').isEmpty || (double.tryParse(v!) ?? 0) > 0 ? null : 'Enter a valid amount',
+                  ),
+                ],
               ],
             ],
             const SizedBox(height: 16),

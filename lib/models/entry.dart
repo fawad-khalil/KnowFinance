@@ -19,6 +19,7 @@ class Entry {
     this.source = EntrySource.manual,
     this.investmentId,
     this.investmentFlow,
+    this.quantity,
   });
 
   final int? id;
@@ -38,6 +39,9 @@ class Entry {
   final int? investmentId;
   final InvestmentFlow? investmentFlow;
 
+  /// How much of the investment this bought or sold, in its unit.
+  final double? quantity;
+
   bool get needsRate => fxRate == null;
 
   /// Amount in the home currency, or null while the rate is missing.
@@ -54,6 +58,7 @@ class Entry {
     String? note,
     int? Function()? investmentId,
     InvestmentFlow? Function()? investmentFlow,
+    double? Function()? quantity,
   }) =>
       Entry(
         id: id,
@@ -68,6 +73,7 @@ class Entry {
         source: source,
         investmentId: investmentId != null ? investmentId() : this.investmentId,
         investmentFlow: investmentFlow != null ? investmentFlow() : this.investmentFlow,
+        quantity: quantity != null ? quantity() : this.quantity,
       );
 
   Map<String, Object?> toMap() => {
@@ -83,6 +89,7 @@ class Entry {
         'source': source.name,
         'investment_id': investmentId,
         'investment_flow': investmentFlow?.name,
+        'quantity': quantity,
       };
 
   factory Entry.fromMap(Map<String, Object?> m) => Entry(
@@ -98,6 +105,7 @@ class Entry {
         source: EntrySource.fromName(m['source'] as String),
         investmentId: m['investment_id'] as int?,
         investmentFlow: InvestmentFlow.fromName(m['investment_flow'] as String?),
+        quantity: (m['quantity'] as num?)?.toDouble(),
       );
 }
 

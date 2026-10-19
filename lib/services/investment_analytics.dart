@@ -19,6 +19,17 @@ class Holding {
   double sold = 0;
   double income = 0;
 
+  /// Units bought and sold, from entries that recorded a quantity.
+  double qtyBought = 0;
+  double qtySold = 0;
+
+  /// Buy amounts for entries that recorded a quantity, so the average price
+  /// isn't skewed by buys logged without one.
+  double boughtWithQty = 0;
+
+  /// Buys logged without a quantity; their units are missing from [held].
+  int buysWithoutQty = 0;
+
   /// Entries in another currency without a rate; left out of the totals.
   int skipped = 0;
   DateTime? first;
@@ -30,13 +41,49 @@ class Holding {
   /// Cash already back: sale proceeds plus dividends, rent and profit.
   double get returned => sold + income;
 
-  /// What is still held, in the home currency. Zero once closed; null while
-  /// open and not valued in the home currency.
+  bool get tracksQuantity => investment.unit != null && qtyBought > 0;
+
+  /// Units still held.
+  double get held => tracksQuantity ? qtyBought - qtySold : 0;
+
+  /// Average price paid for one unit, before costs.
+  double? get avgBuyPrice => tracksQuantity && boughtWithQty > 0 ? boughtWithQty / qtyBought : null;
+
+  /// Today's market price for one unit, when fetched in the home currency.
+  double? marketPrice(String home) =>
+      investment.marketCurrency == home ? investment.marketPrice : null;
+
+  /// Held units at today's market price.
+  double? marketValue(String home) {
+    final p = marketPrice(home);
+    return p == null || !tracksQuantity ? null : held * p;
+  }
+
+  /// What the units still held cost at the average buy price.
+  double? get costOfHeld => avgBuyPrice == null ? null : avgBuyPrice! * held;
+
+  /// Market price against the average price paid, as a fraction.
+  double? priceChange(String home) {
+    final p = marketPrice(home), a = avgBuyPrice;
+    return p == null || a == null || a <= 0 ? null : p / a - 1;
+  }
+
+  /// Sale proceeds minus what the sold units cost at the average price.
+  double? get realizedGain => avgBuyPrice == null || qtySold <= 0 ? null : sold - avgBuyPrice! * qtySold;
+
+  /// What is still held, in the home currency: zero once closed, the market
+  /// value when a price and quantities are known, otherwise the value typed
+  /// in. Null while open with neither.
   double? valueIn(String home) {
     if (investment.closed) return 0;
+    final market = marketValue(home);
+    if (market != null) return market;
     if (investment.currentValue == null || investment.valueCurrency != home) return null;
     return investment.currentValue;
   }
+
+  /// When [valueIn] was last true.
+  DateTime? get valuedOn => investment.marketPrice != null && tracksQuantity ? investment.marketPriceOn : investment.valuedOn;
 
   /// Returned plus what is still held, minus what went in. Null while the
   /// holding is open and has no current value.
@@ -62,7 +109,7 @@ class Holding {
           (e.date, e.kind == EntryKind.expense ? -e.homeAmount! : e.homeAmount!),
     ];
     final v = valueIn(home);
-    if (v != null && v > 0) out.add((investment.valuedOn ?? now ?? DateTime.now(), v));
+    if (v != null && v > 0) out.add((valuedOn ?? now ?? DateTime.now(), v));
     return out;
   }
 
@@ -117,13 +164,21 @@ class InvestmentAnalytics {
         continue;
       }
       final flow = e.investmentFlow ?? InvestmentFlow.defaultFor(e.kind);
+      final q = e.quantity;
       switch (flow) {
         case InvestmentFlow.buy:
           h.bought += amt;
+          if (q != null && q > 0) {
+            h.qtyBought += q;
+            h.boughtWithQty += amt;
+          } else {
+            h.buysWithoutQty++;
+          }
         case InvestmentFlow.cost:
           h.costs += amt;
         case InvestmentFlow.sale:
           h.sold += amt;
+          if (q != null && q > 0) h.qtySold += q;
         case InvestmentFlow.income:
           h.income += amt;
       }

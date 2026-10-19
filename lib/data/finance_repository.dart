@@ -202,7 +202,7 @@ class FinanceRepository {
 
   /// Deletes the investment and unlinks its entries; the entries stay.
   Future<void> deleteInvestment(int id) => _db.transaction((txn) async {
-        await txn.update('entries', {'investment_id': null, 'investment_flow': null},
+        await txn.update('entries', {'investment_id': null, 'investment_flow': null, 'quantity': null},
             where: 'investment_id = ?', whereArgs: [id]);
         await txn.delete('investments', where: 'id = ?', whereArgs: [id]);
       });
@@ -226,11 +226,18 @@ class FinanceRepository {
 
   /// Links entries to [investmentId] with the given flows, or unlinks them
   /// when [investmentId] is null.
-  Future<void> linkEntries(int? investmentId, Map<int, InvestmentFlow?> flows) => _db.transaction((txn) async {
+  /// [quantities] sets how much each entry bought or sold, where known.
+  Future<void> linkEntries(int? investmentId, Map<int, InvestmentFlow?> flows, {Map<int, double?> quantities = const {}}) =>
+      _db.transaction((txn) async {
         for (final f in flows.entries) {
           await txn.update(
             'entries',
-            {'investment_id': investmentId, 'investment_flow': investmentId == null ? null : f.value?.name},
+            {
+              'investment_id': investmentId,
+              'investment_flow': investmentId == null ? null : f.value?.name,
+              if (investmentId == null) 'quantity': null,
+              if (quantities.containsKey(f.key)) 'quantity': quantities[f.key],
+            },
             where: 'id = ?',
             whereArgs: [f.key],
           );

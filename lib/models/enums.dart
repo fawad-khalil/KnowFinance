@@ -61,9 +61,12 @@ enum AssetType {
   fund('Mutual fund'),
   property('Property'),
   gold('Gold'),
+  silver('Silver'),
+  commodity('Commodity'),
   crypto('Crypto'),
   deposit('Savings scheme'),
   business('Business'),
+  vehicle('Vehicle'),
   other('Other');
 
   const AssetType(this.label);
@@ -71,4 +74,35 @@ enum AssetType {
 
   static AssetType fromName(String name) =>
       AssetType.values.firstWhere((t) => t.name == name, orElse: () => AssetType.other);
+}
+
+/// What an asset is counted in. Mass units carry their weight in grams so
+/// prices can be converted between them (gold is quoted per troy ounce,
+/// bought per tola or gram).
+enum QuantityUnit {
+  gram('g', 1),
+  tola('tola', 11.6638038),
+  troyOunce('troy oz', 31.1034768),
+  kilogram('kg', 1000),
+  pound('lb', 453.59237),
+  barrel('barrel'),
+  share('share'),
+  coin('coin'),
+  unit('unit');
+
+  const QuantityUnit(this.label, [this.grams]);
+  final String label;
+  final double? grams;
+
+  static QuantityUnit? fromName(String? name) => name == null
+      ? null
+      : QuantityUnit.values.firstWhere((u) => u.name == name, orElse: () => QuantityUnit.unit);
+
+  /// Factor to turn a price per [from] into a price per this unit, or null
+  /// when the two can't be compared (barrels and grams).
+  double? perUnitFactor(QuantityUnit from) {
+    if (from == this) return 1;
+    if (grams != null && from.grams != null) return grams! / from.grams!;
+    return null;
+  }
 }
