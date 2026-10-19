@@ -84,3 +84,11 @@ final recentNotesProvider = FutureProvider<List<String>>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(repositoryProvider).recentNotes();
 });
+
+/// Entries for the Insights screen: the shared date range only, ignoring the
+/// list's kind, bucket and note filters.
+final insightsEntriesProvider = FutureProvider<List<Entry>>((ref) {
+  ref.watch(dataVersionProvider);
+  final f = ref.watch(filterProvider);
+  return ref.watch(repositoryProvider).entries(EntryFilter(preset: f.preset, range: f.range));
+});
