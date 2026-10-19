@@ -37,11 +37,18 @@ Currency currencyFor(String code) => currencies.firstWhere(
       orElse: () => Currency(code, code),
     );
 
+/// Whole amounts are shown without decimals ("PKR 4,500"); fractional
+/// amounts use the currency's usual number of decimals.
 String formatMoney(double amount, String code) {
   final c = currencyFor(code);
+  final whole = amount == amount.roundToDouble();
   return NumberFormat.currency(
     locale: 'en_US',
     symbol: '${c.code} ',
-    decimalDigits: c.decimals,
+    decimalDigits: whole ? 0 : c.decimals,
   ).format(amount);
 }
+
+/// Short form for chart labels: "PKR 1.2M".
+String compactMoney(double amount, String code) =>
+    '$code ${NumberFormat.compact(locale: 'en_US').format(amount)}';
