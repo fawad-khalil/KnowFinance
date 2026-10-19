@@ -36,7 +36,7 @@ class InsightsScreen extends ConsumerWidget {
                 }
                 final periods = a.timeline(start: range.start, end: range.end);
                 return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
                   children: [
                     if (a.skipped > 0)
                       Padding(

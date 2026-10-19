@@ -34,6 +34,15 @@ Reports:
   currency, year or month; columns by year, quarter, month or bucket;
   showing totals, counts, averages or % of total, for all years or one year
 
+Feature requests:
+
+- A lightbulb button on every tab takes a screenshot, opens a short form
+  (feature, improvement or problem; title; details) and then opens a mail
+  app addressed to iam.fawad.khalil@gmail.com with the screenshot attached.
+  Android shows a chooser of installed mail apps; iOS uses Apple Mail, or the
+  share sheet when no Apple Mail account is set up. It can be hidden in
+  Settings.
+
 Import (inbox icon on the Entries screen):
 
 - Android: scan bank and wallet SMS (first scan looks back 90 days)

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/app_database.dart';
+import 'feedback/feature_request.dart';
 import 'state/providers.dart';
 import 'ui/home_shell.dart';
 
@@ -34,6 +35,7 @@ class KnowFinanceApp extends StatelessWidget {
         brightness: Brightness.dark,
         useMaterial3: true,
       ),
+      builder: (context, child) => RepaintBoundary(key: screenshotBoundaryKey, child: child),
       home: const HomeShell(),
     );
   }

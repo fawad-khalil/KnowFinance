@@ -124,3 +124,18 @@ final allEntriesProvider = FutureProvider<List<Entry>>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(repositoryProvider).entries(const EntryFilter(preset: DatePreset.allTime));
 });
+
+class ShowFeatureRequestButton extends Notifier<bool> {
+  static const _key = 'show_feature_request_button';
+
+  @override
+  bool build() => ref.watch(preferencesProvider).getBool(_key) ?? true;
+
+  Future<void> set(bool value) async {
+    await ref.read(preferencesProvider).setBool(_key, value);
+    state = value;
+  }
+}
+
+final showFeatureRequestButtonProvider =
+    NotifierProvider<ShowFeatureRequestButton, bool>(ShowFeatureRequestButton.new);

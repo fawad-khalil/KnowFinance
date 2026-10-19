@@ -57,6 +57,13 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: const Text('From bank SMS, pasted emails or CSV statements'),
             onTap: () => ImportScreen.open(context),
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.lightbulb_outline),
+            title: const Text('Feature request button'),
+            subtitle: const Text('Shows a button on every tab to send an idea with a screenshot'),
+            value: ref.watch(showFeatureRequestButtonProvider),
+            onChanged: (v) => ref.read(showFeatureRequestButtonProvider.notifier).set(v),
+          ),
           ListTile(
             leading: const Icon(Icons.category_outlined),
             title: const Text('Income & expense types'),

@@ -43,7 +43,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           if (_year != null && !years.contains(_year)) _year = null;
           final scoped = _year == null ? entries : entries.where((e) => e.date.year == _year).toList();
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
             children: [
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
