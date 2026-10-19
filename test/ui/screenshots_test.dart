@@ -1,4 +1,4 @@
-// Renders the Insights screen with sample data to a PNG for eyeballing
+// Renders the Insights and Reports screens with sample data to a PNG for eyeballing
 // layout. Skipped unless SCREENSHOT_DIR is set.
 import 'dart:io';
 
@@ -33,8 +33,8 @@ Future<void> _loadFonts() async {
 void main() {
   sqfliteFfiInit();
 
-  for (final dark in [false, true]) {
-    testWidgets('insights screenshot ${dark ? 'dark' : 'light'}', skip: _dir == null, (tester) async {
+  for (final (tab, dark) in [('Insights', false), ('Insights', true), ('Reports', false), ('Reports', true)]) {
+    testWidgets('$tab screenshot ${dark ? 'dark' : 'light'}', skip: _dir == null, (tester) async {
       tester.view.physicalSize = const Size(1080, 7600);
       tester.view.devicePixelRatio = 2.6;
       tester.platformDispatcher.platformBrightnessTestValue = dark ? Brightness.dark : Brightness.light;
@@ -50,18 +50,21 @@ void main() {
         Future<void> add(String cat, double amt, DateTime d, String note, EntryKind k) => repo.saveEntry(Entry(
               kind: k, amount: amt, currency: 'PKR', homeCurrency: 'PKR', fxRate: 1,
               categoryId: cats[cat]!, date: d, note: note));
-        for (var m = 5; m <= 10; m++) {
-          await add('Salary', 250000, DateTime(2026, m, 1), 'Xorlogics', EntryKind.income);
-          if (m.isEven) await add('Freelance', 60000.0 + m * 1000, DateTime(2026, m, 15), 'Upwork', EntryKind.income);
-          await add('Rent', 70000, DateTime(2026, m, 2), 'House rent', EntryKind.expense);
-          await add('Groceries', 25000.0 + m * 900, DateTime(2026, m, 6), 'Imtiaz', EntryKind.expense);
-          await add('Groceries', 9000, DateTime(2026, m, 18), 'imtiaz', EntryKind.expense);
-          await add('Utilities', 18000.0 - m * 500, DateTime(2026, m, 10), 'K-Electric', EntryKind.expense);
-          await add('Fuel & transport', 15000, DateTime(2026, m, 12), 'Careem', EntryKind.expense);
-          await add('Dining out', 8000.0 + m * 1500, DateTime(2026, m, 20), 'KFC', EntryKind.expense);
-          await add('Shopping', 12000, DateTime(2026, m, 22), 'Daraz', EntryKind.expense);
-          await add('Committee (BC)', 30000, DateTime(2026, m, 5), 'BC', EntryKind.expense);
-          await add('Investments', 20000, DateTime(2026, m, 25), 'Meezan fund', EntryKind.expense);
+        for (var i = 0; i < 18; i++) {
+          final m = i < 12 ? i + 1 : i - 11;
+          final y = i < 12 ? 2025 : 2026;
+          if (y == 2025 && m < 5) continue;
+          await add('Salary', 250000, DateTime(y, m, 1), 'Xorlogics', EntryKind.income);
+          if (m.isEven) await add('Freelance', 60000.0 + m * 1000, DateTime(y, m, 15), 'Upwork', EntryKind.income);
+          await add('Rent', 70000, DateTime(y, m, 2), 'House rent', EntryKind.expense);
+          await add('Groceries', 25000.0 + m * 900, DateTime(y, m, 6), 'Imtiaz', EntryKind.expense);
+          await add('Groceries', 9000, DateTime(y, m, 18), 'imtiaz', EntryKind.expense);
+          await add('Utilities', 18000.0 - m * 500, DateTime(y, m, 10), 'K-Electric', EntryKind.expense);
+          await add('Fuel & transport', 15000, DateTime(y, m, 12), 'Careem', EntryKind.expense);
+          await add('Dining out', 8000.0 + m * 1500, DateTime(y, m, 20), 'KFC', EntryKind.expense);
+          await add('Shopping', 12000, DateTime(y, m, 22), 'Daraz', EntryKind.expense);
+          await add('Committee (BC)', 30000, DateTime(y, m, 5), 'BC', EntryKind.expense);
+          await add('Investments', 20000, DateTime(y, m, 25), 'Meezan fund', EntryKind.expense);
         }
       });
       final scope = ProviderScope(
@@ -74,12 +77,12 @@ void main() {
       await tester.pumpWidget(scope);
       final container = ProviderScope.containerOf(tester.element(find.byType(KnowFinanceApp)));
       container.read(filterProvider.notifier).update((f) => f.copyWith(preset: DatePreset.allTime));
-      await tester.tap(find.text('Insights'));
+      await tester.tap(find.text(tab));
       for (var i = 0; i < 8; i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
         await tester.pump(const Duration(milliseconds: 300));
       }
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_dir/insights_${dark ? 'dark' : 'light'}.png'));
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_dir/${tab.toLowerCase()}_${dark ? 'dark' : 'light'}.png'));
       await tester.runAsync(db.close);
     });
   }

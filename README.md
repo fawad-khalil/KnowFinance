@@ -26,6 +26,14 @@ Insights (follows the selected date range):
 - Income vs expenses line chart, and income vs Needs, Wants and Savings
 - Spending grouped by note (case-insensitive, extra spaces ignored)
 
+Reports:
+
+- Year by year: income, Needs, Wants, Savings, expenses, net, share kept
+  and average monthly spend
+- Pivot table for expenses or income: rows by bucket, type, note, source,
+  currency, year or month; columns by year, quarter, month or bucket;
+  showing totals, counts, averages or % of total, for all years or one year
+
 Import (inbox icon on the Entries screen):
 
 - Android: scan bank and wallet SMS (first scan looks back 90 days)
@@ -47,10 +55,10 @@ flutter run            # with a phone or emulator connected
 flutter test
 ```
 
-To render the Insights screen to PNGs with sample data:
+To render the Insights and Reports screens to PNGs with sample data:
 
 ```sh
-FLUTTER_ROOT=<flutter sdk> SCREENSHOT_DIR=/tmp/shots flutter test test/ui/insights_screenshot_test.dart --update-goldens
+FLUTTER_ROOT=<flutter sdk> SCREENSHOT_DIR=/tmp/shots flutter test test/ui/screenshots_test.dart --update-goldens
 ```
 
 Exchange rates come from the free
