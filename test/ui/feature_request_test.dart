@@ -20,12 +20,18 @@ void main() {
   sqfliteFfiInit();
 
   test('email body carries details and context', () {
-    const r = FeatureRequest(RequestType.feature, 'Budgets', 'Monthly limits per type', null);
-    expect(r.subject, 'KnowFinance Feature request: Budgets');
+    const r = FeatureRequest('Budgets\nMonthly limits per type', null);
+    expect(r.subject, 'KnowFinance feedback: Budgets');
     final body = r.body(screen: 'Insights');
-    expect(body, startsWith('Monthly limits per type'));
+    expect(body, startsWith('Budgets\nMonthly limits per type'));
     expect(body, contains('Screen: Insights'));
     expect(body, isNot(contains('Screenshot attached')));
+  });
+
+  test('long first lines are shortened in the subject', () {
+    final r = FeatureRequest('${'a' * 80}\nmore', null);
+    expect(r.subject.length, lessThanOrEqualTo('KnowFinance feedback: '.length + 60));
+    expect(r.subject, endsWith('...'));
   });
 
   testWidgets('button captures the screen and opens the form', (tester) async {
@@ -52,17 +58,17 @@ void main() {
     }
 
     await settle();
-    expect(find.byTooltip('Request a feature'), findsOneWidget);
-    await tester.tap(find.byTooltip('Request a feature'));
+    expect(find.byTooltip('Send feedback'), findsOneWidget);
+    await tester.tap(find.byTooltip('Send feedback'));
     await settle();
     await settle();
 
-    expect(find.text('Request a feature'), findsOneWidget);
+    expect(find.text('Send feedback'), findsOneWidget);
     expect(find.text('Attach screenshot'), findsOneWidget);
 
     await tester.tap(find.text('Next'));
     await tester.pump();
-    expect(find.text('Add a short title'), findsOneWidget);
+    expect(find.text('Write a few words first'), findsOneWidget);
 
     await tester.runAsync(db.close);
   });

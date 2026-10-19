@@ -59,8 +59,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
           SwitchListTile(
             secondary: const Icon(Icons.lightbulb_outline),
-            title: const Text('Feature request button'),
-            subtitle: const Text('Shows a button on every tab to send an idea with a screenshot'),
+            title: const Text('Feedback button'),
+            subtitle: const Text('Shows a button on every tab to send feedback with a screenshot'),
             value: ref.watch(showFeatureRequestButtonProvider),
             onChanged: (v) => ref.read(showFeatureRequestButtonProvider.notifier).set(v),
           ),

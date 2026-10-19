@@ -140,4 +140,71 @@ void main() {
     expect(d.expense, 10);
     expect(d.income, 50);
   });
+
+  group('booked profit', () {
+    Entry q(int inv, InvestmentFlow flow, double amount, DateTime date, {double? qty}) => Entry(
+          kind: flow.kind,
+          amount: amount,
+          currency: 'PKR',
+          homeCurrency: 'PKR',
+          fxRate: 1,
+          categoryId: 1,
+          date: date,
+          investmentId: inv,
+          investmentFlow: flow,
+          quantity: qty,
+        );
+    final a = InvestmentAnalytics(
+      [
+        const Investment(id: 1, name: 'Gold', type: AssetType.gold, unit: QuantityUnit.tola),
+        const Investment(id: 2, name: 'Shares', type: AssetType.stocks, closed: true),
+        const Investment(id: 3, name: 'Plot', type: AssetType.property),
+      ],
+      [
+        // Gold: 3 tola at 100k average, sell 1 tola in March for 150k.
+        q(1, InvestmentFlow.buy, 300000, DateTime(2025, 1, 1), qty: 3),
+        q(1, InvestmentFlow.sale, 150000, DateTime(2026, 3, 1), qty: 1),
+        // Shares: 200k in, sold in two halves; closed, so cost splits by proceeds.
+        q(2, InvestmentFlow.buy, 200000, DateTime(2025, 1, 1)),
+        q(2, InvestmentFlow.sale, 90000, DateTime(2025, 12, 1)),
+        q(2, InvestmentFlow.sale, 210000, DateTime(2026, 2, 1)),
+        q(2, InvestmentFlow.income, 5000, DateTime(2026, 1, 15)),
+        // Plot: rent in 2026, and a part sale with no way to know its cost.
+        q(3, InvestmentFlow.buy, 1000000, DateTime(2024, 1, 1)),
+        q(3, InvestmentFlow.income, 40000, DateTime(2026, 4, 1)),
+        q(3, InvestmentFlow.sale, 300000, DateTime(2026, 5, 1)),
+      ],
+      'PKR',
+    );
+
+    test('sums income and gains on sales inside the range only', () {
+      final rows = a.booked(start: DateTime(2026, 1, 1), end: DateTime(2026, 12, 31));
+      final by = {for (final r in rows) r.holding.investment.name: r};
+      expect(by['Gold']!.gain, 50000);
+      // 210k of 300k proceeds carries 70% of the 200k cost.
+      expect(by['Shares']!.gain, closeTo(210000 - 140000, 1e-6));
+      expect(by['Shares']!.income, 5000);
+      expect(by['Plot']!.income, 40000);
+      expect(by['Plot']!.unknownCost, 1);
+      expect(by['Plot']!.gain, 0);
+      expect(by['Plot']!.total, 40000);
+    });
+
+    test('earlier sale falls in its own year', () {
+      final rows = a.booked(start: DateTime(2025, 1, 1), end: DateTime(2025, 12, 31));
+      expect(rows.single.holding.investment.name, 'Shares');
+      expect(rows.single.gain, closeTo(90000 - 60000, 1e-6));
+    });
+
+    test('timeline has every month, gains and income apart', () {
+      final t = a.bookedTimeline(start: DateTime(2026, 1, 1), end: DateTime(2026, 6, 30));
+      expect(t.length, 6);
+      expect(t[0].income, 5000);
+      expect(t[1].gain, closeTo(70000, 1e-6));
+      expect(t[2].gain, 50000);
+      expect(t[3].income, 40000);
+      // The plot sale has no known cost, so May shows nothing.
+      expect(t[4].total, 0);
+    });
+  });
 }

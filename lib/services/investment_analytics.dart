@@ -121,6 +121,35 @@ class Holding {
   }
 }
 
+/// Profit realised by one asset inside a date range: dividends and rent
+/// received, plus sale proceeds minus what the sold part had cost.
+class BookedProfit {
+  BookedProfit(this.holding);
+
+  final Holding holding;
+  double income = 0;
+  double proceeds = 0;
+  double costOfSold = 0;
+
+  /// Sales whose cost couldn't be worked out (an open asset sold in part
+  /// without quantities); their proceeds are left out of [gain].
+  int unknownCost = 0;
+  double unknownProceeds = 0;
+
+  double get gain => proceeds - unknownProceeds - costOfSold;
+  double get total => income + gain;
+}
+
+/// Booked profit for one month or year, for the chart.
+class BookedPeriod {
+  BookedPeriod(this.start);
+
+  final DateTime start;
+  double income = 0;
+  double gain = 0;
+  double get total => income + gain;
+}
+
 class PortfolioSummary {
   const PortfolioSummary({
     required this.invested,
@@ -228,6 +257,92 @@ class InvestmentAnalytics {
       out[h.investment.type] = (out[h.investment.type] ?? 0) + h.invested;
     }
     return out;
+  }
+
+  /// What a sale entry's sold part had cost: its units at the average buy
+  /// price, or for a closed asset counted without units, its share of
+  /// everything put in. Null when neither applies.
+  double? costOfSale(Holding h, Entry sale) {
+    final amt = sale.homeAmount;
+    if (amt == null) return null;
+    final avg = h.avgBuyPrice;
+    if (avg != null && (sale.quantity ?? 0) > 0) return avg * sale.quantity!;
+    if (h.investment.closed && h.sold > 0) return h.invested * amt / h.sold;
+    return null;
+  }
+
+  bool _inRange(DateTime d, DateTime? start, DateTime? end) {
+    final day = DateTime(d.year, d.month, d.day);
+    return (start == null || !day.isBefore(start)) && (end == null || !day.isAfter(end));
+  }
+
+  /// Profit booked between [start] and [end] (inclusive; null is open),
+  /// per asset, biggest first. Assets with nothing booked are left out.
+  List<BookedProfit> booked({DateTime? start, DateTime? end}) {
+    final out = <BookedProfit>[];
+    for (final h in holdings) {
+      final b = BookedProfit(h);
+      var any = false;
+      for (final e in h.entries) {
+        if (e.homeCurrency != home || e.homeAmount == null || !_inRange(e.date, start, end)) continue;
+        switch (e.investmentFlow ?? InvestmentFlow.defaultFor(e.kind)) {
+          case InvestmentFlow.income:
+            b.income += e.homeAmount!;
+            any = true;
+          case InvestmentFlow.sale:
+            b.proceeds += e.homeAmount!;
+            final cost = costOfSale(h, e);
+            if (cost == null) {
+              b.unknownCost++;
+              b.unknownProceeds += e.homeAmount!;
+            } else {
+              b.costOfSold += cost;
+            }
+            any = true;
+          case InvestmentFlow.buy:
+          case InvestmentFlow.cost:
+            break;
+        }
+      }
+      if (any) out.add(b);
+    }
+    return out..sort((a, b) => b.total.compareTo(a.total));
+  }
+
+  /// Booked profit per month (or per year over spans longer than two
+  /// years), with no gaps, for a bar chart.
+  List<BookedPeriod> bookedTimeline({DateTime? start, DateTime? end}) {
+    final events = <(DateTime, double, bool)>[];
+    for (final h in holdings) {
+      for (final e in h.entries) {
+        if (e.homeCurrency != home || e.homeAmount == null || !_inRange(e.date, start, end)) continue;
+        final flow = e.investmentFlow ?? InvestmentFlow.defaultFor(e.kind);
+        if (flow == InvestmentFlow.income) events.add((e.date, e.homeAmount!, true));
+        if (flow == InvestmentFlow.sale) {
+          final cost = costOfSale(h, e);
+          if (cost != null) events.add((e.date, e.homeAmount! - cost, false));
+        }
+      }
+    }
+    if (events.isEmpty) return const [];
+    final from = start ?? events.map((e) => e.$1).reduce((a, b) => a.isBefore(b) ? a : b);
+    final to = end ?? events.map((e) => e.$1).reduce((a, b) => a.isAfter(b) ? a : b);
+    final yearly = (to.year - from.year) * 12 + to.month - from.month >= 24;
+    DateTime keyOf(DateTime d) => yearly ? DateTime(d.year) : DateTime(d.year, d.month);
+    final periods = <DateTime, BookedPeriod>{};
+    for (var d = keyOf(from); !d.isAfter(keyOf(to)); d = yearly ? DateTime(d.year + 1) : DateTime(d.year, d.month + 1)) {
+      periods[d] = BookedPeriod(d);
+    }
+    for (final (d, amt, isIncome) in events) {
+      final p = periods[keyOf(d)];
+      if (p == null) continue;
+      if (isIncome) {
+        p.income += amt;
+      } else {
+        p.gain += amt;
+      }
+    }
+    return periods.values.toList();
   }
 
   /// Dividend and rent income per year.

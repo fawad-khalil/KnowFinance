@@ -56,6 +56,11 @@ Assets & investments (Assets tab):
   priced, otherwise typed in), profit or loss, ROI, income yield,
   annualised return (XIRR) and how long it has been held
 - Portfolio totals and a split of money invested by type
+- Profit booked in a chosen period (this month, last month, last 3 months,
+  this year, all time or a custom range): dividends and rent received plus
+  gains on sales, with a monthly (or yearly) bar chart and a row per asset.
+  A sale's cost is its units at the average buy price, or for a closed
+  asset counted without units, its share of everything put in
 
 Reports:
 
@@ -65,10 +70,11 @@ Reports:
   currency, year or month; columns by year, quarter, month or bucket;
   showing totals, counts, averages or % of total, for all years or one year
 
-Feature requests:
+Feedback:
 
-- A lightbulb button on every tab takes a screenshot, opens a short form
-  (feature, improvement or problem; title; details) and then opens a mail
+- A lightbulb button on every tab takes a screenshot, opens a one-box form
+  (just say what you'd like or what went wrong; sorting it into a feature,
+  improvement or bug is left to the developer) and then opens a mail
   app addressed to iam.fawad.khalil@gmail.com with the screenshot attached.
   Android shows a chooser of installed mail apps; iOS uses Apple Mail, or the
   share sheet when no Apple Mail account is set up. It can be hidden in

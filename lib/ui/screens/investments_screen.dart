@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/currency.dart';
+import '../../models/entry_filter.dart';
 import '../../models/enums.dart';
 import '../../services/analytics.dart';
 import '../../services/investment_analytics.dart';
@@ -46,11 +48,15 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
     setState(() => _refreshing = false);
     if (updated > 0) ref.read(dataVersionProvider.notifier).bump();
     if (force) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(updated > 0
-            ? 'Updated ${updated == 1 ? '1 price' : '$updated prices'}.'
-            : 'No prices updated. Check your connection, or add a price feed to an asset.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updated > 0
+                ? 'Updated ${updated == 1 ? '1 price' : '$updated prices'}.'
+                : 'No prices updated. Check your connection, or add a price feed to an asset.',
+          ),
+        ),
+      );
     }
   }
 
@@ -102,7 +108,11 @@ class _Empty extends StatelessWidget {
           children: [
             Icon(Icons.trending_up, size: 48, color: theme.colorScheme.primary),
             const SizedBox(height: 16),
-            Text('Track your assets and what they earn', style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
+            Text(
+              'Track your assets and what they earn',
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
             Text(
               'Add gold, silver, oil, crypto, stocks, a plot or anything else you own. Link the expenses that bought '
@@ -135,6 +145,7 @@ class _Portfolio extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
       children: [
         _SummaryCard(summary: a.summary(), currency: a.home),
+        _BookedCard(analytics: a),
         if (byType.length > 1)
           _Card(
             title: 'Where it is invested',
@@ -172,19 +183,19 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        margin: const EdgeInsets.only(top: 12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              child,
-            ],
-          ),
-        ),
-      );
+    margin: const EdgeInsets.only(top: 12),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    ),
+  );
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -213,14 +224,14 @@ class _SummaryCard extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     signedMoney(s.profit, currency),
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, color: plColor(context, s.profit)),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: plColor(context, s.profit),
+                    ),
                   ),
                 ),
               ),
-              if (s.roi != null) ...[
-                const SizedBox(width: 8),
-                ChangeChip(value: s.roi! * 100),
-              ],
+              if (s.roi != null) ...[const SizedBox(width: 8), ChangeChip(value: s.roi! * 100)],
             ],
           ),
           const SizedBox(height: 16),
@@ -319,8 +330,10 @@ class _HoldingTile extends StatelessWidget {
             ),
           ),
           if (roi != null)
-            Text('${roi >= 0 ? '+' : '−'}${(roi.abs() * 100).toStringAsFixed(1)}%',
-                style: theme.textTheme.bodySmall?.copyWith(color: plColor(context, profit!))),
+            Text(
+              '${roi >= 0 ? '+' : '−'}${(roi.abs() * 100).toStringAsFixed(1)}%',
+              style: theme.textTheme.bodySmall?.copyWith(color: plColor(context, profit!)),
+            ),
         ],
       ),
     );
@@ -345,28 +358,28 @@ class _MarketRow extends StatelessWidget {
     final max = cost > value ? cost : value;
     final colors = ChartColors.of(context);
     Widget bar(String label, double v, Color c) => Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Row(
-            children: [
-              SizedBox(width: 64, child: Text(label, style: theme.textTheme.labelSmall)),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: max <= 0 ? 0 : v / max,
-                    minHeight: 10,
-                    color: c,
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  ),
-                ),
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          SizedBox(width: 64, child: Text(label, style: theme.textTheme.labelSmall)),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: max <= 0 ? 0 : v / max,
+                minHeight: 10,
+                color: c,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
               ),
-              SizedBox(
-                width: 84,
-                child: Text(compactMoney(v, home), textAlign: TextAlign.right, style: theme.textTheme.labelMedium),
-              ),
-            ],
+            ),
           ),
-        );
+          SizedBox(
+            width: 84,
+            child: Text(compactMoney(v, home), textAlign: TextAlign.right, style: theme.textTheme.labelMedium),
+          ),
+        ],
+      ),
+    );
     return InkWell(
       onTap: () => InvestmentDetailScreen.open(context, h.investment.id!),
       child: Padding(
@@ -394,6 +407,238 @@ class _MarketRow extends StatelessWidget {
   }
 }
 
+/// Profit actually realised in a chosen period: dividends and rent
+/// received plus gains on what was sold.
+class _BookedCard extends StatefulWidget {
+  const _BookedCard({required this.analytics});
+
+  final InvestmentAnalytics analytics;
+
+  @override
+  State<_BookedCard> createState() => _BookedCardState();
+}
+
+class _BookedCardState extends State<_BookedCard> {
+  var _preset = DatePreset.thisYear;
+  DateRange? _custom;
+
+  DateRange get _range => _preset == DatePreset.custom ? _custom! : DateRange.forPreset(_preset);
+
+  Future<void> _pick(DatePreset p) async {
+    if (p != DatePreset.custom) {
+      setState(() => _preset = p);
+      return;
+    }
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(now.year + 1),
+      initialDateRange: DateTimeRange(start: DateTime(now.year), end: now),
+    );
+    if (picked == null) return;
+    setState(() {
+      _preset = DatePreset.custom;
+      _custom = DateRange(picked.start, picked.end);
+    });
+  }
+
+  String get _rangeLabel {
+    if (_preset != DatePreset.custom) return _preset.label;
+    final f = DateFormat('d MMM yy');
+    return '${f.format(_custom!.start!)} – ${f.format(_custom!.end!)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = widget.analytics;
+    final theme = Theme.of(context);
+    final home = a.home;
+    final r = _range;
+    final rows = a.booked(start: r.start, end: r.end);
+    final timeline = a.bookedTimeline(start: r.start, end: r.end);
+    final income = rows.fold<double>(0, (t, b) => t + b.income);
+    final gain = rows.fold<double>(0, (t, b) => t + b.gain);
+    final unknown = rows.fold<int>(0, (t, b) => t + b.unknownCost);
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+
+    return _Card(
+      title: 'Profit booked',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: PopupMenuButton<DatePreset>(
+              onSelected: _pick,
+              itemBuilder: (_) => [
+                for (final p in DatePreset.values)
+                  PopupMenuItem(value: p, child: Text(p == DatePreset.custom ? 'Custom range…' : p.label)),
+              ],
+              child: Chip(avatar: const Icon(Icons.date_range, size: 18), label: Text(_rangeLabel)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (rows.isEmpty)
+            Text('Nothing sold and no dividends or rent in this period.', style: muted)
+          else ...[
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                signedMoney(income + gain, home),
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: plColor(context, income + gain),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              runSpacing: 8,
+              children: [
+                StatTile(label: 'Dividends & rent', value: compactMoney(income, home)),
+                StatTile(label: 'Gains on sales', value: signedMoney(gain, home, compact: true)),
+              ],
+            ),
+            if (timeline.length > 1) ...[const SizedBox(height: 16), _BookedBars(periods: timeline, currency: home)],
+            const SizedBox(height: 8),
+            for (final b in rows)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                onTap: () => InvestmentDetailScreen.open(context, b.holding.investment.id!),
+                leading: Icon(assetIcon(b.holding.investment.type)),
+                title: Text(b.holding.investment.name),
+                subtitle: Text(
+                  [
+                    if (b.income > 0) 'income ${compactMoney(b.income, home)}',
+                    if (b.proceeds > 0) 'sold for ${compactMoney(b.proceeds, home)}',
+                    if (b.proceeds - b.unknownProceeds > 0) 'cost ${compactMoney(b.costOfSold, home)}',
+                  ].join(' · '),
+                ),
+                trailing: Text(
+                  signedMoney(b.total, home, compact: true),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: plColor(context, b.total),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            if (unknown > 0)
+              Text(
+                '$unknown ${unknown == 1 ? 'sale is' : 'sales are'} left out of the gain: the asset is still open and the '
+                'sale has no quantity, so its cost is unknown. Set the quantity on the sale.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Small bar chart of booked profit per month or year; losses go below
+/// the line.
+class _BookedBars extends StatelessWidget {
+  const _BookedBars({required this.periods, required this.currency});
+
+  final List<BookedPeriod> periods;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final maxAbs = periods.map((p) => p.total.abs()).fold<double>(0, (a, b) => a > b ? a : b);
+    final hasLoss = periods.any((p) => p.total < 0);
+    final yearly = periods.length > 1 && periods[1].start.month == periods[0].start.month;
+    final fmt = yearly ? DateFormat('yyyy') : DateFormat('MMM');
+    const height = 90.0;
+    final every = (periods.length / 6).ceil().clamp(1, 100);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: hasLoss ? height * 1.6 : height,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final p in periods)
+                Expanded(
+                  child: Tooltip(
+                    message:
+                        '${(yearly ? DateFormat('yyyy') : DateFormat('MMMM yyyy')).format(p.start)}: '
+                        '${signedMoney(p.total, currency)}',
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            flex: 10,
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: FractionallySizedBox(
+                                heightFactor: maxAbs <= 0 || p.total <= 0 ? 0 : p.total / maxAbs,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade600,
+                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (hasLoss)
+                            Expanded(
+                              flex: 6,
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: FractionallySizedBox(
+                                  heightFactor: maxAbs <= 0 || p.total >= 0 ? 0 : (-p.total / maxAbs).clamp(0, 1),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.error,
+                                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(3)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: theme.colorScheme.outlineVariant),
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 16,
+          child: Row(
+            children: [
+              for (var i = 0; i < periods.length; i++)
+                Expanded(
+                  child: i % every == 0
+                      ? OverflowBox(
+                          maxWidth: 48,
+                          child: Text(
+                            fmt.format(periods[i].start),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // Shared bits used by the detail screen too.
 
 /// "2", "2.5" or "0.125": up to four decimals, no trailing zeros.
@@ -403,21 +648,20 @@ String formatQuantity(double q) {
 }
 
 IconData assetIcon(AssetType t) => switch (t) {
-      AssetType.stocks => Icons.candlestick_chart_outlined,
-      AssetType.fund => Icons.pie_chart_outline,
-      AssetType.property => Icons.home_work_outlined,
-      AssetType.gold => Icons.diamond_outlined,
-      AssetType.silver => Icons.diamond_outlined,
-      AssetType.commodity => Icons.oil_barrel_outlined,
-      AssetType.vehicle => Icons.directions_car_outlined,
-      AssetType.crypto => Icons.currency_bitcoin,
-      AssetType.deposit => Icons.savings_outlined,
-      AssetType.business => Icons.storefront_outlined,
-      AssetType.other => Icons.category_outlined,
-    };
+  AssetType.stocks => Icons.candlestick_chart_outlined,
+  AssetType.fund => Icons.pie_chart_outline,
+  AssetType.property => Icons.home_work_outlined,
+  AssetType.gold => Icons.diamond_outlined,
+  AssetType.silver => Icons.diamond_outlined,
+  AssetType.commodity => Icons.oil_barrel_outlined,
+  AssetType.vehicle => Icons.directions_car_outlined,
+  AssetType.crypto => Icons.currency_bitcoin,
+  AssetType.deposit => Icons.savings_outlined,
+  AssetType.business => Icons.storefront_outlined,
+  AssetType.other => Icons.category_outlined,
+};
 
-Color plColor(BuildContext context, double v) =>
-    v >= 0 ? Colors.green.shade600 : Theme.of(context).colorScheme.error;
+Color plColor(BuildContext context, double v) => v >= 0 ? Colors.green.shade600 : Theme.of(context).colorScheme.error;
 
 String signedMoney(double v, String currency, {bool compact = false}) {
   final s = compact ? compactMoney(v.abs(), currency) : formatMoney(v.abs(), currency);

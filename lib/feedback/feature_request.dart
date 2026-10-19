@@ -14,32 +14,26 @@ const featureRequestEmail = 'iam.fawad.khalil@gmail.com';
 /// Wraps the whole app so a screenshot can be taken of whatever is on screen.
 final screenshotBoundaryKey = GlobalKey();
 
-enum RequestType {
-  feature('Feature request'),
-  improvement('Improvement'),
-  bug('Something is wrong');
-
-  const RequestType(this.label);
-  final String label;
-}
-
+/// What the user typed, in their own words. Whether it is a feature, an
+/// improvement or a bug is for the developer to sort out, not the user.
 class FeatureRequest {
-  const FeatureRequest(this.type, this.title, this.details, this.screenshot);
+  const FeatureRequest(this.message, this.screenshot);
 
-  final RequestType type;
-  final String title;
-  final String details;
+  final String message;
 
   /// Null when the user removed the screenshot.
   final File? screenshot;
 
-  String get subject => 'KnowFinance ${type.label}: $title';
+  /// The first line, shortened, so the inbox shows what it is about.
+  String get subject {
+    final first = message.trim().split('\n').first.trim();
+    return 'KnowFinance feedback: ${first.length <= 60 ? first : '${first.substring(0, 57).trimRight()}...'}';
+  }
 
   String body({required String screen}) => [
-        details.trim().isEmpty ? '(No details given)' : details.trim(),
+        message.trim(),
         '',
         '---',
-        'Type: ${type.label}',
         'Screen: $screen',
         'Device: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
         'Sent: ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.now())}',
@@ -129,7 +123,7 @@ class _FeatureRequestButtonState extends State<FeatureRequestButton> {
     if (_capturing) return const SizedBox.shrink();
     return FloatingActionButton.small(
       heroTag: 'feature-request',
-      tooltip: 'Request a feature',
+      tooltip: 'Send feedback',
       onPressed: _start,
       child: const Icon(Icons.lightbulb_outline),
     );
@@ -147,15 +141,12 @@ class FeatureRequestForm extends StatefulWidget {
 
 class _FeatureRequestFormState extends State<FeatureRequestForm> {
   final _form = GlobalKey<FormState>();
-  final _title = TextEditingController();
-  final _details = TextEditingController();
-  var _type = RequestType.feature;
+  final _message = TextEditingController();
   late var _includeShot = widget.screenshot != null;
 
   @override
   void dispose() {
-    _title.dispose();
-    _details.dispose();
+    _message.dispose();
     super.dispose();
   }
 
@@ -163,7 +154,7 @@ class _FeatureRequestFormState extends State<FeatureRequestForm> {
     if (!_form.currentState!.validate()) return;
     Navigator.pop(
       context,
-      FeatureRequest(_type, _title.text.trim(), _details.text, _includeShot ? widget.screenshot : null),
+      FeatureRequest(_message.text, _includeShot ? widget.screenshot : null),
     );
   }
 
@@ -172,7 +163,7 @@ class _FeatureRequestFormState extends State<FeatureRequestForm> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Request a feature'),
+        title: const Text('Send feedback'),
         actions: [TextButton(onPressed: _submit, child: const Text('Next'))],
       ),
       body: Form(
@@ -180,36 +171,17 @@ class _FeatureRequestFormState extends State<FeatureRequestForm> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            SegmentedButton<RequestType>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: RequestType.feature, label: Text('Feature')),
-                ButtonSegment(value: RequestType.improvement, label: Text('Improve')),
-                ButtonSegment(value: RequestType.bug, label: Text('Problem')),
-              ],
-              selected: {_type},
-              onSelectionChanged: (s) => setState(() => _type = s.first),
-            ),
-            const SizedBox(height: 16),
             TextFormField(
-              controller: _title,
+              controller: _message,
               autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),
-              validator: (v) => (v ?? '').trim().isEmpty ? 'Add a short title' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _details,
               minLines: 4,
               maxLines: 10,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
-                labelText: 'Details',
-                hintText: 'What would you like, and why would it help?',
-                alignLabelWithHint: true,
+                hintText: 'An idea, something to improve, or something that went wrong',
                 border: OutlineInputBorder(),
               ),
+              validator: (v) => (v ?? '').trim().isEmpty ? 'Write a few words first' : null,
             ),
             if (widget.screenshot != null) ...[
               const SizedBox(height: 16),
