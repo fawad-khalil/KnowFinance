@@ -1,0 +1,86 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../data/app_database.dart';
+import '../data/finance_repository.dart';
+import '../models/category.dart';
+import '../models/currency.dart';
+import '../models/entry.dart';
+import '../models/entry_filter.dart';
+import '../services/fx_service.dart';
+
+/// Overridden in main() once the database is open.
+final appDatabaseProvider = Provider<AppDatabase>(
+  (ref) => throw UnimplementedError('appDatabaseProvider must be overridden'),
+);
+
+/// Overridden in main() once preferences are loaded.
+final preferencesProvider = Provider<SharedPreferences>(
+  (ref) => throw UnimplementedError('preferencesProvider must be overridden'),
+);
+
+final repositoryProvider =
+    Provider<FinanceRepository>((ref) => FinanceRepository(ref.watch(appDatabaseProvider)));
+
+final fxServiceProvider = Provider<FxService>((ref) => FxService(ref.watch(repositoryProvider)));
+
+class HomeCurrencyNotifier extends Notifier<String> {
+  static const _key = 'home_currency';
+
+  @override
+  String build() => ref.watch(preferencesProvider).getString(_key) ?? defaultCurrencyCode;
+
+  /// Saves the new home currency and re-bases existing entries. Returns how
+  /// many entries still need a rate typed in.
+  Future<int> set(String code) async {
+    await ref.read(preferencesProvider).setString(_key, code);
+    state = code;
+    final missing = await ref.read(fxServiceProvider).refreshEntries(code);
+    ref.read(dataVersionProvider.notifier).bump();
+    return missing;
+  }
+}
+
+final homeCurrencyProvider =
+    NotifierProvider<HomeCurrencyNotifier, String>(HomeCurrencyNotifier.new);
+
+/// Bumped after every write so lists and charts reload.
+class DataVersion extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+final dataVersionProvider = NotifierProvider<DataVersion, int>(DataVersion.new);
+
+class FilterNotifier extends Notifier<EntryFilter> {
+  @override
+  EntryFilter build() => const EntryFilter();
+
+  void update(EntryFilter Function(EntryFilter) change) => state = change(state);
+}
+
+final filterProvider = NotifierProvider<FilterNotifier, EntryFilter>(FilterNotifier.new);
+
+/// All categories including archived ones, so old entries keep their labels.
+final categoriesProvider = FutureProvider<List<Category>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).categories(includeArchived: true);
+});
+
+final categoryByIdProvider = Provider<Map<int, Category>>((ref) {
+  final list = ref.watch(categoriesProvider).value ?? const [];
+  return {for (final c in list) c.id!: c};
+});
+
+final entriesProvider = FutureProvider<List<Entry>>((ref) {
+  ref.watch(dataVersionProvider);
+  final filter = ref.watch(filterProvider);
+  return ref.watch(repositoryProvider).entries(filter);
+});
+
+final recentNotesProvider = FutureProvider<List<String>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).recentNotes();
+});
