@@ -5,7 +5,9 @@ expenses into Needs, Wants and Savings, and seeing where the money goes.
 
 ## Status
 
-Step 1 of the plan is in place:
+Steps 1 and 2 of the plan are in place.
+
+Logging:
 
 - Add, edit and delete income and expenses (swipe left to delete)
 - Income types and expense types, each expense type in Needs, Wants or Savings
@@ -15,8 +17,17 @@ Step 1 of the plan is in place:
 - Filters for date range, income/expense, bucket and note text (case-insensitive)
 - Everything is stored on the device (SQLite)
 
-Coming next: charts and insights, then SMS (Android), email and bank
-statement import for Pakistani banks.
+Insights (follows the selected date range):
+
+- Savings analysis: Needs, Wants and Savings as a share of income, compared
+  with the 50/30/20 guide
+- Expense pie that drills down from bucket to expense type to note groups
+- Income by type pie
+- Income vs expenses line chart, and income vs Needs, Wants and Savings
+- Spending grouped by note (case-insensitive, extra spaces ignored)
+
+Coming next: SMS (Android), email and bank statement import for Pakistani
+banks.
 
 ## Running
 
@@ -24,6 +35,12 @@ statement import for Pakistani banks.
 flutter pub get
 flutter run            # with a phone or emulator connected
 flutter test
+```
+
+To render the Insights screen to PNGs with sample data:
+
+```sh
+FLUTTER_ROOT=<flutter sdk> SCREENSHOT_DIR=/tmp/shots flutter test test/ui/insights_screenshot_test.dart --update-goldens
 ```
 
 Exchange rates come from the free
