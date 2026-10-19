@@ -5,7 +5,7 @@ expenses into Needs, Wants and Savings, and seeing where the money goes.
 
 ## Status
 
-Steps 1 and 2 of the plan are in place.
+Steps 1 and 2 of the plan are in place, and step 3 (import) has its first version.
 
 Logging:
 
@@ -26,8 +26,18 @@ Insights (follows the selected date range):
 - Income vs expenses line chart, and income vs Needs, Wants and Savings
 - Spending grouped by note (case-insensitive, extra spaces ignored)
 
-Coming next: SMS (Android), email and bank statement import for Pakistani
-banks.
+Import (inbox icon on the Entries screen):
+
+- Android: scan bank and wallet SMS (first scan looks back 90 days)
+- Any platform: paste SMS or email text, or pick a CSV bank statement
+- Recognises HBL, MCB, UBL, Meezan, Allied, Bank Alfalah, Bank Al Habib,
+  Faysal, Standard Chartered, Askari, JS Bank, NBP, JazzCash, Easypaisa,
+  SadaPay and NayaPay; skips OTPs, reminders, offers and failed payments
+- Everything lands in a review list with a suggested type before it is
+  added; the same message is never imported twice
+
+The parser was written from the general shape of Pakistani bank alerts and
+still needs tuning against real messages.
 
 ## Running
 
