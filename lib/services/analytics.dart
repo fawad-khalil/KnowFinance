@@ -15,6 +15,16 @@ class Share {
 
 enum Granularity { day, month }
 
+/// Everything logged on one day, for the activity heatmap.
+class DayActivity {
+  DayActivity(this.day);
+
+  final DateTime day;
+  int count = 0;
+  double income = 0;
+  double expense = 0;
+}
+
 /// Totals for one point on the time axis.
 class Period {
   Period(this.start);
@@ -171,6 +181,22 @@ class Analytics {
       }
     }
     return periods.values.toList();
+  }
+
+  /// Entries per calendar day, keyed by midnight.
+  Map<DateTime, DayActivity> daily() {
+    final out = <DateTime, DayActivity>{};
+    for (final e in entries) {
+      final d = DateTime(e.date.year, e.date.month, e.date.day);
+      final a = out.putIfAbsent(d, () => DayActivity(d));
+      a.count++;
+      if (e.kind == EntryKind.income) {
+        a.income += e.homeAmount!;
+      } else {
+        a.expense += e.homeAmount!;
+      }
+    }
+    return out;
   }
 
   static Granularity granularityFor(DateTime from, DateTime to) =>

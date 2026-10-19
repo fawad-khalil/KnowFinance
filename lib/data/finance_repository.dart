@@ -6,6 +6,7 @@ import '../models/category.dart';
 import '../models/entry.dart';
 import '../models/entry_filter.dart';
 import '../models/enums.dart';
+import '../models/investment.dart';
 import '../services/analytics.dart';
 import 'app_database.dart';
 
@@ -184,4 +185,55 @@ class FinanceRepository {
     final rows = await _db.query('entries', columns: ['note', 'category_id'], where: "note != ''", orderBy: 'date ASC, id ASC');
     return {for (final r in rows) normalizeNote(r['note'] as String): r['category_id'] as int};
   }
+
+  // Investments
+
+  Future<List<Investment>> investments() async {
+    final rows = await _db.query('investments', orderBy: 'closed, name COLLATE NOCASE');
+    return rows.map(Investment.fromMap).toList();
+  }
+
+  Future<int> saveInvestment(Investment i) async {
+    final map = i.toMap()..remove('id');
+    if (i.id == null) return _db.insert('investments', map);
+    await _db.update('investments', map, where: 'id = ?', whereArgs: [i.id]);
+    return i.id!;
+  }
+
+  /// Deletes the investment and unlinks its entries; the entries stay.
+  Future<void> deleteInvestment(int id) => _db.transaction((txn) async {
+        await txn.update('entries', {'investment_id': null, 'investment_flow': null},
+            where: 'investment_id = ?', whereArgs: [id]);
+        await txn.delete('investments', where: 'id = ?', whereArgs: [id]);
+      });
+
+  /// Every entry linked to any investment, oldest first.
+  Future<List<Entry>> investmentEntries() async {
+    final rows = await _db.query('entries', where: 'investment_id IS NOT NULL', orderBy: 'date ASC, id ASC');
+    return rows.map(Entry.fromMap).toList();
+  }
+
+  /// Entries not linked to an investment that could belong to one:
+  /// Savings-bucket expenses and all income, newest first.
+  Future<List<Entry>> unlinkedInvestmentCandidates() async {
+    final rows = await _db.rawQuery(
+      'SELECT e.* FROM entries e JOIN categories c ON c.id = e.category_id'
+      " WHERE e.investment_id IS NULL AND (c.bucket = 'savings' OR e.kind = 'income')"
+      ' ORDER BY e.date DESC, e.id DESC',
+    );
+    return rows.map(Entry.fromMap).toList();
+  }
+
+  /// Links entries to [investmentId] with the given flows, or unlinks them
+  /// when [investmentId] is null.
+  Future<void> linkEntries(int? investmentId, Map<int, InvestmentFlow?> flows) => _db.transaction((txn) async {
+        for (final f in flows.entries) {
+          await txn.update(
+            'entries',
+            {'investment_id': investmentId, 'investment_flow': investmentId == null ? null : f.value?.name},
+            where: 'id = ?',
+            whereArgs: [f.key],
+          );
+        }
+      });
 }

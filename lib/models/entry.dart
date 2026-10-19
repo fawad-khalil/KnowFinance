@@ -17,6 +17,8 @@ class Entry {
     required this.date,
     this.note = '',
     this.source = EntrySource.manual,
+    this.investmentId,
+    this.investmentFlow,
   });
 
   final int? id;
@@ -32,6 +34,10 @@ class Entry {
   final String note;
   final EntrySource source;
 
+  /// The investment this entry bought, cost, sold or earned from, if any.
+  final int? investmentId;
+  final InvestmentFlow? investmentFlow;
+
   bool get needsRate => fxRate == null;
 
   /// Amount in the home currency, or null while the rate is missing.
@@ -46,6 +52,8 @@ class Entry {
     int? categoryId,
     DateTime? date,
     String? note,
+    int? Function()? investmentId,
+    InvestmentFlow? Function()? investmentFlow,
   }) =>
       Entry(
         id: id,
@@ -58,6 +66,8 @@ class Entry {
         date: date ?? this.date,
         note: note ?? this.note,
         source: source,
+        investmentId: investmentId != null ? investmentId() : this.investmentId,
+        investmentFlow: investmentFlow != null ? investmentFlow() : this.investmentFlow,
       );
 
   Map<String, Object?> toMap() => {
@@ -71,6 +81,8 @@ class Entry {
         'date': dateKey(date),
         'note': note,
         'source': source.name,
+        'investment_id': investmentId,
+        'investment_flow': investmentFlow?.name,
       };
 
   factory Entry.fromMap(Map<String, Object?> m) => Entry(
@@ -84,6 +96,8 @@ class Entry {
         date: DateTime.parse(m['date'] as String),
         note: m['note'] as String,
         source: EntrySource.fromName(m['source'] as String),
+        investmentId: m['investment_id'] as int?,
+        investmentFlow: InvestmentFlow.fromName(m['investment_flow'] as String?),
       );
 }
 

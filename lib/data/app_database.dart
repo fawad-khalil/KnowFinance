@@ -9,7 +9,7 @@ class AppDatabase {
 
   final Database db;
 
-  static const _version = 2;
+  static const _version = 3;
 
   /// Opens the on-device database. [factory] and [path] let tests use an
   /// in-memory database through sqflite_common_ffi.
@@ -64,6 +64,7 @@ class AppDatabase {
       )''');
 
     await _createImports(db);
+    await _createInvestments(db);
 
     final batch = db.batch();
     for (final c in defaultCategories) {
@@ -74,6 +75,25 @@ class AppDatabase {
 
   static Future<void> _upgrade(Database db, int from, int to) async {
     if (from < 2) await _createImports(db);
+    if (from < 3) await _createInvestments(db);
+  }
+
+  /// Holdings that entries can be linked to, so buys and costs can be set
+  /// against sales and dividend or rent income.
+  static Future<void> _createInvestments(Database db) async {
+    await db.execute('''
+      CREATE TABLE investments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        current_value REAL,
+        value_currency TEXT,
+        valued_on TEXT,
+        closed INTEGER NOT NULL DEFAULT 0
+      )''');
+    await db.execute('ALTER TABLE entries ADD COLUMN investment_id INTEGER REFERENCES investments(id) ON DELETE SET NULL');
+    await db.execute('ALTER TABLE entries ADD COLUMN investment_flow TEXT');
+    await db.execute('CREATE INDEX entries_investment ON entries(investment_id)');
   }
 
   /// Transactions read from SMS, email or statements wait here until the

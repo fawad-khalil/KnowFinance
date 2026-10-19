@@ -6,6 +6,7 @@ import '../../models/enums.dart';
 import '../../services/analytics.dart';
 import '../../state/providers.dart';
 import '../chart_colors.dart';
+import '../widgets/activity_heatmap.dart';
 import '../widgets/breakdown_pie.dart';
 import '../widgets/filter_bar.dart';
 import '../widgets/trend_chart.dart';
@@ -19,6 +20,7 @@ class InsightsScreen extends ConsumerWidget {
     final cats = ref.watch(categoryByIdProvider);
     final home = ref.watch(homeCurrencyProvider);
     final range = ref.watch(filterProvider).effectiveRange();
+    final previous = ref.watch(previousPeriodEntriesProvider).value;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Insights')),
@@ -47,6 +49,20 @@ class InsightsScreen extends ConsumerWidget {
                           style: TextStyle(color: Theme.of(context).colorScheme.error),
                         ),
                       ),
+                    _KpiGrid(
+                      current: a.savings(),
+                      previous: range.previous() == null || previous == null ? null : Analytics(previous, cats, home).savings(),
+                      currency: home,
+                    ),
+                    _Section(
+                      title: 'Transaction activity',
+                      child: ActivityHeatmap(
+                        days: a.daily(),
+                        start: range.start ?? a.entries.map((e) => e.date).reduce((x, y) => x.isBefore(y) ? x : y),
+                        end: range.end ?? a.entries.map((e) => e.date).reduce((x, y) => x.isAfter(y) ? x : y),
+                        currency: home,
+                      ),
+                    ),
                     _SavingsCard(summary: a.savings(), currency: home),
                     _Section(title: 'Where the money went', child: _ExpenseDrillDown(analytics: a)),
                     _Section(
@@ -187,6 +203,123 @@ class _ExpenseDrillDownState extends State<_ExpenseDrillDown> {
           onTap: onTap,
         ),
       ],
+    );
+  }
+}
+
+/// Headline figures with the change from the period before, as in a
+/// dashboard's stat cards.
+class _KpiGrid extends StatelessWidget {
+  const _KpiGrid({required this.current, required this.previous, required this.currency});
+
+  final SavingsSummary current;
+
+  /// Null when the range is unbounded, so there is nothing to compare with.
+  final SavingsSummary? previous;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = current, p = previous;
+    final keptPct = c.income > 0 ? c.pct(c.kept) : null;
+    final prevKeptPct = p != null && p.income > 0 ? p.pct(p.kept) : null;
+    final cards = [
+      _Kpi(label: 'Income', icon: Icons.south_west, value: formatMoney(c.income, currency), change: _pctChange(c.income, p?.income)),
+      _Kpi(
+        label: 'Expenses',
+        icon: Icons.north_east,
+        value: formatMoney(c.expense, currency),
+        change: _pctChange(c.expense, p?.expense),
+        upIsGood: false,
+      ),
+      _Kpi(
+        label: 'Net',
+        icon: Icons.account_balance_wallet_outlined,
+        value: formatMoney(c.unallocated, currency),
+        change: _pctChange(c.unallocated, p?.unallocated),
+      ),
+      _Kpi(
+        label: 'Kept',
+        icon: Icons.savings_outlined,
+        value: keptPct == null ? '–' : '${keptPct.toStringAsFixed(0)}%',
+        change: keptPct == null || prevKeptPct == null ? null : (keptPct - prevKeptPct, true),
+      ),
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        children: [
+          Row(children: [Expanded(child: cards[0]), const SizedBox(width: 8), Expanded(child: cards[1])]),
+          const SizedBox(height: 8),
+          Row(children: [Expanded(child: cards[2]), const SizedBox(width: 8), Expanded(child: cards[3])]),
+        ],
+      ),
+    );
+  }
+
+  /// Percent change, or null when there is no earlier figure to divide by.
+  static (double, bool)? _pctChange(double now, double? before) =>
+      before == null || before == 0 ? null : ((now - before) / before.abs() * 100, false);
+}
+
+class _Kpi extends StatelessWidget {
+  const _Kpi({required this.label, required this.icon, required this.value, this.change, this.upIsGood = true});
+
+  final String label;
+  final IconData icon;
+  final String value;
+
+  /// The change and whether it is in percentage points rather than percent.
+  final (double, bool)? change;
+  final bool upIsGood;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final ch = change;
+    final good = ch != null && (ch.$1 >= 0) == upIsGood;
+    final color = ch == null || ch.$1.abs() < 0.5
+        ? theme.colorScheme.onSurfaceVariant
+        : good
+            ? Colors.green.shade600
+            : theme.colorScheme.error;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(label, style: theme.textTheme.labelMedium),
+            ]),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 4),
+            ch == null
+                ? Text('No earlier period', style: muted)
+                : Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                      child: Text(
+                        '${ch.$1 >= 0 ? '+' : '−'}${ch.$1.abs().toStringAsFixed(1)}${ch.$2 ? ' pts' : '%'}',
+                        style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(child: Text('vs previous', style: muted, overflow: TextOverflow.ellipsis)),
+                  ]),
+          ],
+        ),
+      ),
     );
   }
 }

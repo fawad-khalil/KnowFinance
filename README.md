@@ -19,12 +19,31 @@ Logging:
 
 Insights (follows the selected date range):
 
+- Headline cards for income, expenses, net and share kept, each with the
+  change from the period before (month-to-date compares with the same days
+  of last month)
+- Transaction activity heatmap: one square per day, shaded by number of
+  transactions, spending or income; tap a day for its totals
 - Savings analysis: Needs, Wants and Savings as a share of income, compared
   with the 50/30/20 guide
 - Expense pie that drills down from bucket to expense type to note groups
 - Income by type pie
 - Income vs expenses line chart, and income vs Needs, Wants and Savings
 - Spending grouped by note (case-insensitive, extra spaces ignored)
+
+Investments (Invest tab):
+
+- Add a holding (stocks, mutual fund, property, gold, crypto, savings
+  scheme, business, other) and link entries to it: expenses as Buy or Cost
+  (fees, tax, upkeep), income as Sale or Dividend / rent
+- Link from the entry form (an investment whose name the note mentions is
+  picked automatically) or from the holding's page, which lists unlinked
+  Savings expenses and income with matching notes already ticked
+- Per holding: invested, cash returned, current value, profit or loss, ROI,
+  income yield, annualised return (XIRR) and how long it has been held
+- Portfolio totals and a split of money invested by type. Open holdings
+  need a current value (Update on their page) to count towards profit;
+  closed ones don't
 
 Reports:
 
@@ -64,7 +83,7 @@ flutter run            # with a phone or emulator connected
 flutter test
 ```
 
-To render the Insights and Reports screens to PNGs with sample data:
+To render the Insights, Invest and Reports screens to PNGs with sample data:
 
 ```sh
 FLUTTER_ROOT=<flutter sdk> SCREENSHOT_DIR=/tmp/shots flutter test test/ui/screenshots_test.dart --update-goldens

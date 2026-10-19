@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'enums.dart';
 
 /// Preset date ranges offered by the filter bar.
@@ -39,6 +41,25 @@ class DateRange {
       case DatePreset.custom:
         return const DateRange(null, null);
     }
+  }
+
+  /// The span just before this one, for "vs previous period" figures. A
+  /// range starting on the 1st moves back by whole months, so "this month so
+  /// far" compares with the same days of last month. Null when unbounded.
+  DateRange? previous() {
+    final s = start, e = end;
+    if (s == null || e == null) return null;
+    if (s.day == 1) {
+      final months = (e.year - s.year) * 12 + e.month - s.month + 1;
+      final monthEnd = DateTime(e.year, e.month + 1, 0).day == e.day;
+      final lastDay = DateTime(e.year, e.month - months + 1, 0).day;
+      return DateRange(
+        DateTime(s.year, s.month - months),
+        DateTime(e.year, e.month - months, monthEnd ? lastDay : math.min(e.day, lastDay)),
+      );
+    }
+    final days = e.difference(s).inDays + 1;
+    return DateRange(DateTime(s.year, s.month, s.day - days), DateTime(s.year, s.month, s.day - 1));
   }
 }
 

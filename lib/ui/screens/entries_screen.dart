@@ -159,8 +159,12 @@ class _EntryTile extends ConsumerWidget {
     final foreign = entry.currency != home;
     final homeAmt = entry.homeCurrency == home ? entry.homeAmount : null;
 
+    final investment = entry.investmentId == null
+        ? null
+        : ref.watch(investmentsProvider).value?.where((i) => i.id == entry.investmentId).firstOrNull;
     final subtitle = [
       if (cat?.bucket != null) cat!.bucket!.label,
+      if (investment != null) '${(entry.investmentFlow ?? InvestmentFlow.defaultFor(entry.kind)).label}: ${investment.name}',
       if (entry.note.isNotEmpty) entry.note,
     ].join(' · ');
 

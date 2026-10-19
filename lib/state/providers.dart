@@ -10,6 +10,7 @@ import '../models/category.dart';
 import '../models/currency.dart';
 import '../models/entry.dart';
 import '../models/entry_filter.dart';
+import '../models/investment.dart';
 import '../services/fx_service.dart';
 
 /// Overridden in main() once the database is open.
@@ -96,6 +97,15 @@ final insightsEntriesProvider = FutureProvider<List<Entry>>((ref) {
   return ref.watch(repositoryProvider).entries(EntryFilter(preset: f.preset, range: f.range));
 });
 
+/// Entries for the period before the selected range, for the change
+/// figures on Insights. Empty when the range is unbounded.
+final previousPeriodEntriesProvider = FutureProvider<List<Entry>>((ref) async {
+  ref.watch(dataVersionProvider);
+  final prev = ref.watch(filterProvider).effectiveRange().previous();
+  if (prev == null) return const [];
+  return ref.watch(repositoryProvider).entries(EntryFilter(preset: DatePreset.custom, range: prev));
+});
+
 final pendingImportsProvider = FutureProvider<List<PendingImport>>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(repositoryProvider).pendingImports();
@@ -123,6 +133,16 @@ final importServiceProvider = Provider<ImportService>((ref) => ImportService(
 final allEntriesProvider = FutureProvider<List<Entry>>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(repositoryProvider).entries(const EntryFilter(preset: DatePreset.allTime));
+});
+
+final investmentsProvider = FutureProvider<List<Investment>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).investments();
+});
+
+final investmentEntriesProvider = FutureProvider<List<Entry>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).investmentEntries();
 });
 
 class ShowFeatureRequestButton extends Notifier<bool> {
