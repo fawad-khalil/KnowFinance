@@ -14,6 +14,10 @@ import '../../models/currency.dart';
 import '../../models/enums.dart';
 import '../../state/providers.dart';
 
+/// Hidden for now: banks send statements as PDF, and only CSV is read so
+/// far. The CSV parser stays for when PDF reading is added.
+const statementImportEnabled = false;
+
 /// Brings in transactions from SMS, pasted text or statements, and lists
 /// them for review before they become entries.
 class ImportScreen extends ConsumerStatefulWidget {
@@ -147,11 +151,12 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
                   icon: const Icon(Icons.content_paste),
                   label: const Text('Paste SMS or email'),
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: _busy ? null : _statement,
-                  icon: const Icon(Icons.description_outlined),
-                  label: const Text('Bank statement (CSV)'),
-                ),
+                if (statementImportEnabled)
+                  FilledButton.tonalIcon(
+                    onPressed: _busy ? null : _statement,
+                    icon: const Icon(Icons.description_outlined),
+                    label: const Text('Bank statement (CSV)'),
+                  ),
               ],
             ),
           ),

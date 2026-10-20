@@ -83,10 +83,13 @@ Feedback:
 Import (inbox icon on the Entries screen):
 
 - Android: scan bank and wallet SMS (first scan looks back 90 days)
-- Any platform: paste SMS or email text, or pick a CSV bank statement
+- Any platform: paste SMS or email text. (Statement import is hidden until
+  PDF statements can be read; the CSV reader is kept for then.)
 - Recognises HBL, MCB, UBL, Meezan, Allied, Bank Alfalah, Bank Al Habib,
   Faysal, Standard Chartered, Askari, JS Bank, NBP, JazzCash, Easypaisa,
   SadaPay and NayaPay; skips OTPs, reminders, offers and failed payments
+- Bank fees named in an alert ("Fee: Rs.15.00") are added to the expense, so
+  it matches what left the account
 - Everything lands in a review list with a suggested type before it is
   added; the same message is never imported twice
 

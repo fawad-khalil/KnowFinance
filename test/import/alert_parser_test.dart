@@ -73,4 +73,77 @@ void main() {
     final r = p('PKR 800 spent at CAREEM using card expiring 12/2029 on 17/10/2026');
     expect(r.date, DateTime(2026, 10, 17));
   });
+
+  group('real alerts (masked)', () {
+    final received = DateTime(2026, 10, 20, 9);
+    ({EntryKind kind, double amount, DateTime date, String who}) r(String text) {
+      final t = parser.parse(text, receivedAt: received)!;
+      return (kind: t.kind, amount: t.amount, date: t.date, who: t.counterparty);
+    }
+
+    test('RAAST payment received', () {
+      final x = r('PKR 25,000.00 received from ABC AC#xxxPYMT PK94SCBL888777 as RAAST payment to your AC# 986987 '
+          'of XYZ BR LHR on 19-Oct-2026 at 18:11');
+      expect(x.kind, EntryKind.income);
+      expect(x.amount, 25000);
+      expect(x.date, DateTime(2026, 10, 19));
+      expect(x.who, 'ABC');
+    });
+
+    test('transfer sent with lakh grouping and a fee', () {
+      final t = parser.parse(
+          'PKR 4,23,434.00 sent to ABC JAXX-xxCASH from your A/C xxx6373 on 18-Oct-2026 at 19:22 Fee: Rs.15.00 '
+          'TID:87987987 UAN 02132232333',
+          receivedAt: received)!;
+      expect(t.kind, EntryKind.expense);
+      // The fee left the account too, so it is part of the expense.
+      expect(t.amount, 423449);
+      expect(t.fee, 15);
+      expect(t.date, DateTime(2026, 10, 18));
+      expect(t.counterparty, 'ABC JAXX-xxCASH');
+    });
+
+    test('internet purchase with a misspelt verb', () {
+      final x = r('PKR 4,433.00 charded at Google as internet purchase, from A/C xxx1212 (XYZ BR LHR) on 19-Oct-2026 '
+          'at 01:19 TID:897983');
+      expect(x.kind, EntryKind.expense);
+      expect(x.amount, 4433);
+      expect(x.who, 'Google');
+      expect(x.date, DateTime(2026, 10, 19));
+    });
+
+    test('unclosed bracket after the payee', () {
+      final x = r('PKR 4,23,434.00 sent to ABC (MBL AC from your A/C xxx6373 on 18-Oct-2026 at 19:22 TID:87987987 '
+          'UAN 02132232333');
+      expect(x.kind, EntryKind.expense);
+      expect(x.amount, 423434);
+      expect(x.who, 'ABC');
+    });
+
+    test('debit card payment with numeric date', () {
+      final x = r('Dear Client, PKR 3,645.00 have been paid at MAJNOON on 17-10-26 using Debit Card no. 326XXXXXXX3479.');
+      expect(x.kind, EntryKind.expense);
+      expect(x.amount, 3645);
+      expect(x.who, 'MAJNOON');
+      expect(x.date, DateTime(2026, 10, 17));
+    });
+
+    test('IBFT credit names the sender after the account number', () {
+      final x = r('Dear Client, your account 01-72****48-01 has been credit with amount PKR 48,000.00 from account '
+          '00-05xxxxx-32423423432 FAWAD KHALIL from IBFT 18/10/222 on 18/10/26.');
+      expect(x.kind, EntryKind.income);
+      expect(x.amount, 48000);
+      expect(x.who, 'FAWAD KHALIL');
+      expect(x.date, DateTime(2026, 10, 18));
+    });
+
+    test('RAAST funds transfer sent to an account', () {
+      final x = r('Dear Customer, PKR 100,000.00 sent SCB PK A/C ******4801 from FUNDS TRANSFER on 10-Oct-26 11:36 '
+          'via RAAST for TX ID MBMB1214123131231');
+      expect(x.kind, EntryKind.expense);
+      expect(x.amount, 100000);
+      expect(x.who, 'SCB PK');
+      expect(x.date, DateTime(2026, 10, 10));
+    });
+  });
 }

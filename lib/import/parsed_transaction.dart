@@ -13,6 +13,7 @@ class ParsedTransaction {
     this.counterparty = '',
     this.bank,
     this.balance,
+    this.fee,
   });
 
   final EntryKind kind;
@@ -28,6 +29,10 @@ class ParsedTransaction {
   final String counterparty;
   final String? bank;
   final double? balance;
+
+  /// Bank charge named in the alert ("Fee: Rs.15.00"). Already included in
+  /// [amount] for money going out, so the entry matches what left the account.
+  final double? fee;
 
   /// Same message imported twice gives the same fingerprint.
   String get fingerprint =>

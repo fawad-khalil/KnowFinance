@@ -74,7 +74,27 @@ class AlertParser {
 
   static final _counterparty = RegExp(
     r'\b(?:at|to|from|towards|for|@)\s+([A-Za-z0-9][A-Za-z0-9&\-\._\* ]{1,40}?)'
-    r'(?=\s+(?:on|via|ref|from|to|at|dated|with|for|using|thru|through|txn|tid|avail|bal|is|has|was)\b|[\.,;](?:\s|$)|$)',
+    r'(?=\s+(?:on|via|ref|from|to|at|dated|with|for|using|thru|through|txn|tid|avail|bal|is|has|was|as|a/?c|ac#?)\b'
+    r'|\s*\(|[\.,;](?:\s|$)|$)',
+    caseSensitive: false,
+  );
+
+  /// "from account 00-05xxxxx-3242 FAWAD KHALIL from IBFT": the payer's name
+  /// comes after their account number.
+  static final _nameAfterAccount = RegExp(
+    r'\bfrom\s+(?:account|a/?c|ac)\s*#?\s*[0-9xX\*\-]{4,}\s+([A-Z][A-Za-z\.]*(?:\s+[A-Z][A-Za-z\.]*){0,4}?)'
+    r'(?=\s+(?:from|on|via|through|thru)\b|[\.,;]|$)',
+  );
+
+  /// "PKR 100,000.00 sent SCB PK A/C ******4801": the receiving bank or
+  /// person comes straight after "sent", before their account number.
+  static final _sentToAccount = RegExp(
+    r'\bsent\s+(?!to\b|from\b)([A-Za-z][A-Za-z0-9&\-\. ]{1,30}?)\s+(?:a/?c|ac|account)\b',
+    caseSensitive: false,
+  );
+
+  static final _fee = RegExp(
+    r'\b(?:fee|charges?)\s*:?\s*(?:PKR|Rs\.?)\s*:?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)',
     caseSensitive: false,
   );
 
@@ -129,9 +149,13 @@ class AlertParser {
     final balanceMatch = _balance.firstMatch(body.substring(amountMatch.end));
     final balance = balanceMatch == null ? null : double.tryParse(balanceMatch[1]!.replaceAll(',', ''));
 
+    final feeMatch = _fee.firstMatch(body.substring(amountMatch.end));
+    final fee = feeMatch == null ? null : double.tryParse(feeMatch[1]!.replaceAll(',', ''));
+
     return ParsedTransaction(
       kind: kind,
-      amount: amount,
+      amount: kind == EntryKind.expense && fee != null ? amount + fee : amount,
+      fee: fee,
       currency: _currencyWords[currencyWord.replaceAll('.', '')] ?? 'PKR',
       date: _date(body, receivedAt),
       source: source,
@@ -177,6 +201,8 @@ class AlertParser {
   }
 
   static String _merchant(String body, EntryKind kind) {
+    final special = kind == EntryKind.income ? _nameAfterAccount.firstMatch(body) : _sentToAccount.firstMatch(body);
+    if (special != null) return _tidy(special[1]!);
     final candidates = _counterparty.allMatches(body).map((m) => m[1]!.trim()).where((c) {
       final l = c.toLowerCase();
       return !RegExp(r'^(your|a/?c|acc|account|card|the|pkr|rs|\d)').hasMatch(l) && c.length > 1;
