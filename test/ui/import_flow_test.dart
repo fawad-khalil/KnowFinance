@@ -66,4 +66,58 @@ void main() {
     expect(entries!.map((e) => e.note), containsAll(['IMTIAZ SUPER MARKET', 'K-ELECTRIC']));
     await tester.runAsync(db.close);
   });
+
+  testWidgets('a second alert for the same transfer is flagged and left for review', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.6;
+    late AppDatabase db;
+    late SharedPreferences prefs;
+    await tester.runAsync(() async {
+      db = await AppDatabase.open(factory: databaseFactoryFfi, path: inMemoryDatabasePath);
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+    });
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        preferencesProvider.overrideWithValue(prefs),
+      ],
+      child: const KnowFinanceApp(),
+    ));
+    Future<void> settle() async {
+      for (var i = 0; i < 6; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    await settle();
+    await tester.tap(find.byTooltip('Import transactions'));
+    await settle();
+    await tester.tap(find.text('Paste SMS or email'));
+    await settle();
+    await tester.enterText(
+      find.byType(TextField).last,
+      'PKR 4,23,434.00 sent to ABC JAXX-xxCASH from your A/C xxx6373 on 18-Oct-2026 at 19:22 Fee: Rs.15.00\n\n'
+      'PKR 4,23,434.00 sent to ABC (MBL AC from your A/C xxx6373 on 18-Oct-2026 at 19:22 TID:87987987',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+    await settle();
+    await settle();
+
+    expect(find.text('2 to review'), findsOneWidget);
+    expect(find.textContaining('Possible duplicate'), findsOneWidget);
+    await tester.tap(find.text('Add all'));
+    await settle();
+    await settle();
+    // The duplicate is never added in bulk; it waits for a decision.
+    expect(find.textContaining('Possible duplicate'), findsOneWidget);
+    // Newest first, so the duplicate is the top card.
+    await tester.tap(find.text('Ignore').first);
+    await settle();
+    await settle();
+    expect(find.text('1 to review'), findsOneWidget);
+    expect(find.textContaining('Possible duplicate'), findsNothing);
+    await tester.runAsync(db.close);
+  });
 }

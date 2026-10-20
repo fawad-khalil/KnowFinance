@@ -90,6 +90,13 @@ Import (inbox icon on the Entries screen):
   SadaPay and NayaPay; skips OTPs, reminders, offers and failed payments
 - Bank fees named in an alert ("Fee: Rs.15.00") are added to the expense, so
   it matches what left the account
+- Possible duplicates are flagged: a second alert for the same money (within
+  a fee) or one matching an entry already added. So are likely transfers
+  between your own accounts: money sent to an account you hold (learned from
+  alerts that say "your A/C ..."), money from your own name, or the same
+  amount going out and coming in within two days. Flagged items are never
+  added by "Add all"; "Skip: own transfer" ignores one and remembers that
+  account and name. Settings > Your accounts lists and edits what was learned
 - Everything lands in a review list with a suggested type before it is
   added; the same message is never imported twice
 

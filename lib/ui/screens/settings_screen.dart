@@ -5,6 +5,7 @@ import '../../models/currency.dart';
 import '../../state/providers.dart';
 import 'categories_screen.dart';
 import 'import_screen.dart';
+import 'own_accounts_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -54,8 +55,14 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.move_to_inbox_outlined),
             title: const Text('Import transactions'),
-            subtitle: const Text('From bank SMS, pasted emails or CSV statements'),
+            subtitle: const Text('From bank SMS or pasted alerts and emails'),
             onTap: () => ImportScreen.open(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.account_balance_outlined),
+            title: const Text('Your accounts'),
+            subtitle: const Text('To spot transfers between your own accounts when importing'),
+            onTap: () => OwnAccountsScreen.open(context),
           ),
           SwitchListTile(
             secondary: const Icon(Icons.lightbulb_outline),

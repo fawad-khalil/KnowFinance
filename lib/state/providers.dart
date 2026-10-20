@@ -1,15 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/app_database.dart';
 import '../data/finance_repository.dart';
 import '../import/category_suggester.dart';
+import '../import/import_flags.dart';
 import '../import/import_service.dart';
 import '../import/pending_import.dart';
 import '../models/category.dart';
 import '../models/currency.dart';
 import '../models/entry.dart';
 import '../models/entry_filter.dart';
+import '../models/enums.dart';
 import '../models/investment.dart';
 import '../services/fx_service.dart';
 import '../services/price_service.dart';
@@ -132,6 +135,29 @@ final importServiceProvider = Provider<ImportService>((ref) => ImportService(
       ref.watch(fxServiceProvider),
       ref.watch(preferencesProvider),
     ));
+
+/// Imports that look like duplicates or transfers between the user's own
+/// accounts, keyed by import id.
+final importFlagsProvider = FutureProvider<Map<int, List<ImportFlag>>>((ref) async {
+  final pending = await ref.watch(pendingImportsProvider.future);
+  if (pending.isEmpty) return const {};
+  final service = ref.watch(importServiceProvider);
+  final dates = pending.map((p) => p.date);
+  final from = dates.reduce((a, b) => a.isBefore(b) ? a : b).subtract(const Duration(days: 2));
+  final to = dates.reduce((a, b) => a.isAfter(b) ? a : b).add(const Duration(days: 2));
+  final entries = await ref
+      .watch(repositoryProvider)
+      .entries(EntryFilter(preset: DatePreset.custom, range: DateRange(from, to)));
+  return flagImports(
+    pending,
+    entries: entries,
+    ownAccounts: service.ownAccounts,
+    ownNames: service.ownNames,
+    describe: (p) => '${p.kind == EntryKind.income ? '+' : '−'}${formatMoney(p.amount, p.currency)}'
+        '${p.counterparty.isEmpty ? '' : ' ${p.kind == EntryKind.income ? 'from' : 'to'} ${p.counterparty}'}'
+        ' on ${DateFormat('d MMM').format(p.date)}',
+  );
+});
 
 /// Every entry, for year-by-year reports.
 final allEntriesProvider = FutureProvider<List<Entry>>((ref) {

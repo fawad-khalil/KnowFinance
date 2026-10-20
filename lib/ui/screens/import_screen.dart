@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../import/import_flags.dart';
 import '../../import/import_service.dart';
 import '../../import/pending_import.dart';
 import '../../import/sms_reader.dart';
@@ -98,10 +99,16 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
 
   Future<void> _acceptAll(List<PendingImport> items) async {
     final suggester = await ref.read(categorySuggesterProvider.future);
+    final flags = await ref.read(importFlagsProvider.future);
     final home = ref.read(homeCurrencyProvider);
     setState(() => _busy = true);
-    var added = 0;
+    var added = 0, flagged = 0;
     for (final p in items) {
+      // Possible duplicates and own transfers wait for a decision.
+      if (flags[p.id]?.isNotEmpty ?? false) {
+        flagged++;
+        continue;
+      }
       final cat = suggester.suggest(p.kind, p.counterparty, p.raw);
       if (cat == null) continue;
       await _service.accept(p, categoryId: cat, kind: p.kind, note: p.counterparty, homeCurrency: home);
@@ -112,7 +119,11 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     setState(() => _busy = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added $added. ${items.length - added > 0 ? '${items.length - added} need a type picked.' : ''}'),
+        content: Text([
+          'Added $added.',
+          if (flagged > 0) '$flagged flagged for you to check.',
+          if (items.length - added - flagged > 0) '${items.length - added - flagged} need a type picked.',
+        ].join(' ')),
       ),
     );
   }
@@ -273,6 +284,11 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
     ref.read(dataVersionProvider.notifier).bump();
   }
 
+  Future<void> _ownTransfer() async {
+    await ref.read(importServiceProvider).ignoreAsOwnTransfer(widget.item);
+    ref.read(dataVersionProvider.notifier).bump();
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.item;
@@ -286,6 +302,8 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
     }
     if (_categoryId != null && !cats.any((c) => c.id == _categoryId)) _categoryId = null;
     final isIncome = _kind == EntryKind.income;
+    final flags = ref.watch(importFlagsProvider).value?[p.id] ?? const <ImportFlag>[];
+    final ownTransfer = flags.any((f) => f.kind == FlagKind.ownTransfer);
     final source = switch (p.source) {
       EntrySource.sms => 'SMS',
       EntrySource.email => 'Email',
@@ -318,6 +336,7 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
                 ),
               ],
             ),
+            for (final f in flags) _FlagBanner(flag: f),
             const SizedBox(height: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -370,13 +389,52 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
                   icon: Icon(_showRaw ? Icons.expand_less : Icons.notes),
                 ),
                 const Spacer(),
-                TextButton(onPressed: _ignore, child: const Text('Ignore')),
+                if (ownTransfer)
+                  TextButton(onPressed: _ownTransfer, child: const Text('Skip: own transfer'))
+                else
+                  TextButton(onPressed: _ignore, child: const Text('Ignore')),
                 const SizedBox(width: 4),
                 FilledButton(onPressed: _categoryId == null ? null : _accept, child: const Text('Add')),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FlagBanner extends StatelessWidget {
+  const _FlagBanner({required this.flag});
+
+  final ImportFlag flag;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (icon, title) = switch (flag.kind) {
+      FlagKind.duplicate => (Icons.content_copy, 'Possible duplicate'),
+      FlagKind.ownTransfer => (Icons.swap_horiz, 'Own transfer?'),
+    };
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: scheme.tertiaryContainer, borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: scheme.onTertiaryContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(text: '$title  ', style: const TextStyle(fontWeight: FontWeight.w600)),
+                TextSpan(text: flag.reason),
+              ]),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onTertiaryContainer),
+            ),
+          ),
+        ],
       ),
     );
   }
