@@ -37,7 +37,7 @@ class CategoriesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final all = (ref.watch(categoriesProvider).value ?? const <Category>[]).where((c) => !c.archived).toList();
+    final all = (ref.watch(categoriesProvider).value ?? const <Category>[]).where((c) => !c.archived && !c.isSystem).toList();
     final theme = Theme.of(context);
 
     Widget section(String title, List<Category> items) => Column(

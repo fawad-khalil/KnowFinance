@@ -7,6 +7,7 @@ import '../models/entry.dart';
 import '../models/entry_filter.dart';
 import '../models/enums.dart';
 import '../models/investment.dart';
+import '../models/loan.dart';
 import '../services/analytics.dart';
 import 'app_database.dart';
 
@@ -18,7 +19,7 @@ class FinanceRepository {
 
   // Categories
 
-  Future<List<Category>> categories({EntryKind? kind, bool includeArchived = false}) async {
+  Future<List<Category>> categories({EntryKind? kind, bool includeArchived = false, bool includeSystem = false}) async {
     final where = <String>[];
     final args = <Object?>[];
     if (kind != null) {
@@ -26,6 +27,7 @@ class FinanceRepository {
       args.add(kind.name);
     }
     if (!includeArchived) where.add('archived = 0');
+    if (!includeSystem) where.add('system IS NULL');
     final rows = await _db.query(
       'categories',
       where: where.isEmpty ? null : where.join(' AND '),
@@ -241,6 +243,81 @@ class FinanceRepository {
             where: 'id = ?',
             whereArgs: [f.key],
           );
+        }
+      });
+
+  // Loans
+
+  Future<List<Loan>> loans() async {
+    final rows = await _db.query('loans', orderBy: 'name COLLATE NOCASE');
+    return rows.map(Loan.fromMap).toList();
+  }
+
+  Future<int> saveLoan(Loan l) async {
+    final map = l.toMap()..remove('id');
+    if (l.id == null) return _db.insert('loans', map);
+    await _db.update('loans', map, where: 'id = ?', whereArgs: [l.id]);
+    return l.id!;
+  }
+
+  /// Deletes the loan. Its entries stay but become plain income and
+  /// spending again, so they are left on the "Loan" type to be re-typed.
+  Future<void> deleteLoan(int id) => _db.transaction((txn) async {
+        await txn.update('entries', {'loan_id': null}, where: 'loan_id = ?', whereArgs: [id]);
+        await txn.delete('loans', where: 'id = ?', whereArgs: [id]);
+      });
+
+  /// The app's own "Loan" type for entries of [kind].
+  Future<int> loanCategoryId(EntryKind kind) async {
+    final rows = await _db.query('categories',
+        columns: ['id'], where: "system = 'loan' AND kind = ?", whereArgs: [kind.name], limit: 1);
+    return rows.first['id'] as int;
+  }
+
+  /// Every entry linked to a loan, oldest first.
+  Future<List<Entry>> loanEntries() async {
+    final rows = await _db.query('entries', where: 'loan_id IS NOT NULL', orderBy: 'date ASC, id ASC');
+    return rows.map(Entry.fromMap).toList();
+  }
+
+  /// Entries not yet linked to a loan or an investment, newest first, for
+  /// picking the ones that belong to a loan.
+  Future<List<Entry>> unlinkedLoanCandidates() async {
+    final rows = await _db.query('entries',
+        where: 'loan_id IS NULL AND investment_id IS NULL', orderBy: 'date DESC, id DESC', limit: 300);
+    return rows.map(Entry.fromMap).toList();
+  }
+
+  /// Links entries to [loanId] (or unlinks them when null). Linked entries
+  /// move to the "Loan" type so they leave income and spending; unlinked
+  /// ones keep it until the user picks a type.
+  Future<void> linkLoanEntries(int? loanId, Iterable<Entry> entries) async {
+    final ids = {for (final k in EntryKind.values) k: await loanCategoryId(k)};
+    await _db.transaction((txn) async {
+      for (final e in entries) {
+        await txn.update(
+          'entries',
+          {'loan_id': loanId, if (loanId != null) 'category_id': ids[e.kind]},
+          where: 'id = ?',
+          whereArgs: [e.id],
+        );
+      }
+    });
+  }
+
+  /// Removes every entry, asset, loan and import, keeping types and cached
+  /// rates. Only offered in debug builds, before loading sample data.
+  Future<void> clearAll() => _db.transaction((txn) async {
+        for (final t in ['imports', 'entries', 'investments', 'loans']) {
+          await txn.delete(t);
+        }
+      });
+
+  /// Drops inbox records with these fingerprints, whatever their status, so
+  /// the same alerts can be imported again. Entries made from them stay.
+  Future<void> forgetImports(Iterable<String> fingerprints) => _db.transaction((txn) async {
+        for (final f in fingerprints) {
+          await txn.delete('imports', where: 'fingerprint = ?', whereArgs: [f]);
         }
       });
 }

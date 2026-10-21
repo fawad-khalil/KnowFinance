@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/sample_data.dart';
 import '../../models/currency.dart';
 import '../../state/providers.dart';
 import 'categories_screen.dart';
@@ -38,6 +40,29 @@ class SettingsScreen extends ConsumerWidget {
     ));
   }
 
+  /// Debug builds only: wipes the data and loads about 18 months of
+  /// sample entries, assets, loans and imports, for trying the app out.
+  Future<void> _loadSample(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Replace everything with sample data?'),
+        content: const Text('All entries, assets, loans and imports on this device are deleted first.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Replace')),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final repo = ref.read(repositoryProvider);
+    await repo.clearAll();
+    await seedSampleData(repo);
+    ref.read(dataVersionProvider.notifier).bump();
+    messenger.showSnackBar(const SnackBar(content: Text('Sample data loaded.')));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final home = ref.watch(homeCurrencyProvider);
@@ -64,6 +89,25 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: const Text('To spot transfers between your own accounts when importing'),
             onTap: () => OwnAccountsScreen.open(context),
           ),
+          if (kDebugMode)
+            ListTile(
+              leading: const Icon(Icons.science_outlined),
+              title: const Text('Reset to sample data'),
+              subtitle: const Text('Debug builds only'),
+              onTap: () => _loadSample(context, ref),
+            ),
+          if (kDebugMode)
+            ListTile(
+              leading: const Icon(Icons.sms_outlined),
+              title: const Text('Add sample SMS to import'),
+              subtitle: const Text('Debug builds only. Leaves your entries as they are'),
+              onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final added = await seedSampleImports(ref.read(repositoryProvider));
+                ref.read(dataVersionProvider.notifier).bump();
+                messenger.showSnackBar(SnackBar(content: Text('$added sample alerts added to the import inbox.')));
+              },
+            ),
           SwitchListTile(
             secondary: const Icon(Icons.lightbulb_outline),
             title: const Text('Feedback button'),

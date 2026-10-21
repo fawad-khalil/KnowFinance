@@ -8,6 +8,8 @@ import '../../state/providers.dart';
 import '../chart_colors.dart';
 import '../widgets/activity_heatmap.dart';
 import '../widgets/breakdown_pie.dart';
+import '../widgets/savings_cards.dart';
+import '../widgets/trend_chip.dart';
 import '../widgets/filter_bar.dart';
 import '../widgets/trend_chart.dart';
 
@@ -49,6 +51,11 @@ class InsightsScreen extends ConsumerWidget {
                           style: TextStyle(color: Theme.of(context).colorScheme.error),
                         ),
                       ),
+                    const ThisMonthCard(),
+                    const SavingsHistoryCard(),
+                    const SizedBox(height: 12),
+                    Text('Selected period, against the one before', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 4),
                     _KpiGrid(
                       current: a.savings(),
                       previous: range.previous() == null || previous == null ? null : Analytics(previous, cats, home).savings(),
@@ -56,12 +63,23 @@ class InsightsScreen extends ConsumerWidget {
                     ),
                     _Section(
                       title: 'Transaction activity',
-                      child: ActivityHeatmap(
-                        days: a.daily(),
-                        start: range.start ?? a.entries.map((e) => e.date).reduce((x, y) => x.isBefore(y) ? x : y),
-                        end: range.end ?? a.entries.map((e) => e.date).reduce((x, y) => x.isAfter(y) ? x : y),
-                        currency: home,
-                      ),
+                      child: Builder(builder: (context) {
+                        // At least half a year, so a short range still shows a pattern.
+                        final end = range.end ?? a.entries.map((e) => e.date).reduce((x, y) => x.isAfter(y) ? x : y);
+                        final halfYear = end.subtract(const Duration(days: 26 * 7));
+                        final start = range.start == null || range.start!.isAfter(halfYear)
+                            ? (range.start == null
+                                ? a.entries.map((e) => e.date).reduce((x, y) => x.isBefore(y) ? x : y)
+                                : halfYear)
+                            : range.start!;
+                        final all = ref.watch(allEntriesProvider).value ?? a.entries;
+                        return ActivityHeatmap(
+                          days: Analytics(all, cats, home).daily(),
+                          start: start,
+                          end: end,
+                          currency: home,
+                        );
+                      }),
                     ),
                     _SavingsCard(summary: a.savings(), currency: home),
                     _Section(title: 'Where the money went', child: _ExpenseDrillDown(analytics: a)),
@@ -239,7 +257,7 @@ class _KpiGrid extends StatelessWidget {
         change: _pctChange(c.unallocated, p?.unallocated),
       ),
       _Kpi(
-        label: 'Kept',
+        label: 'Savings',
         icon: Icons.savings_outlined,
         value: keptPct == null ? '–' : '${keptPct.toStringAsFixed(0)}%',
         change: keptPct == null || prevKeptPct == null ? null : (keptPct - prevKeptPct, true),
@@ -278,12 +296,6 @@ class _Kpi extends StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     final ch = change;
-    final good = ch != null && (ch.$1 >= 0) == upIsGood;
-    final color = ch == null || ch.$1.abs() < 0.5
-        ? theme.colorScheme.onSurfaceVariant
-        : good
-            ? Colors.green.shade600
-            : theme.colorScheme.error;
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -306,16 +318,14 @@ class _Kpi extends StatelessWidget {
             ch == null
                 ? Text('No earlier period', style: muted)
                 : Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
-                      child: Text(
-                        '${ch.$1 >= 0 ? '+' : '−'}${ch.$1.abs().toStringAsFixed(1)}${ch.$2 ? ' pts' : '%'}',
-                        style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: TrendChip(value: ch.$1, suffix: ch.$2 ? ' pts' : '%', upIsGood: upIsGood),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(child: Text('vs previous', style: muted, overflow: TextOverflow.ellipsis)),
+
                   ]),
           ],
         ),
@@ -356,7 +366,7 @@ class _SavingsCard extends StatelessWidget {
               Expanded(child: _Stat(label: 'Needs + Wants', value: compactMoney(s.needs + s.wants, currency))),
               Expanded(
                 child: _Stat(
-                  label: 'Kept',
+                  label: 'Savings',
                   value: s.income > 0 ? '${keptPct.toStringAsFixed(0)}%' : '–',
                   emphasis: s.kept < 0 ? theme.colorScheme.error : null,
                 ),
@@ -422,8 +432,8 @@ class _SavingsCard extends StatelessWidget {
     if (needs > 50 && wants > 30) return 'Needs and Wants are both above the 50/30/20 guide.';
     if (wants > 30) return 'Wants are ${(wants - 30).toStringAsFixed(0)} points above the 30% guide.';
     if (needs > 50) return 'Needs are ${(needs - 50).toStringAsFixed(0)} points above the 50% guide.';
-    if (kept >= 20) return 'You kept ${kept.toStringAsFixed(0)}% of your income, at or above the 20% guide.';
-    return 'You kept ${kept.toStringAsFixed(0)}% of your income. The 50/30/20 guide suggests 20%.';
+    if (kept >= 20) return 'You saved ${kept.toStringAsFixed(0)}% of your income, at or above the 20% guide.';
+    return 'You saved ${kept.toStringAsFixed(0)}% of your income. The 50/30/20 guide suggests 20%.';
   }
 }
 

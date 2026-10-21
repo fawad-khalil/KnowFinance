@@ -14,6 +14,7 @@ import '../models/entry.dart';
 import '../models/entry_filter.dart';
 import '../models/enums.dart';
 import '../models/investment.dart';
+import '../models/loan.dart';
 import '../services/fx_service.dart';
 import '../services/price_service.dart';
 
@@ -77,7 +78,7 @@ final filterProvider = NotifierProvider<FilterNotifier, EntryFilter>(FilterNotif
 /// All categories including archived ones, so old entries keep their labels.
 final categoriesProvider = FutureProvider<List<Category>>((ref) {
   ref.watch(dataVersionProvider);
-  return ref.watch(repositoryProvider).categories(includeArchived: true);
+  return ref.watch(repositoryProvider).categories(includeArchived: true, includeSystem: true);
 });
 
 final categoryByIdProvider = Provider<Map<int, Category>>((ref) {
@@ -98,11 +99,16 @@ final recentNotesProvider = FutureProvider<List<String>>((ref) {
 
 /// Entries for the Insights screen: the shared date range only, ignoring the
 /// list's kind, bucket and note filters.
-final insightsEntriesProvider = FutureProvider<List<Entry>>((ref) {
+final insightsEntriesProvider = FutureProvider<List<Entry>>((ref) async {
   ref.watch(dataVersionProvider);
   final f = ref.watch(filterProvider);
-  return ref.watch(repositoryProvider).entries(EntryFilter(preset: f.preset, range: f.range));
+  final list = await ref.watch(repositoryProvider).entries(EntryFilter(preset: f.preset, range: f.range));
+  return withoutLoans(list);
 });
+
+/// Loans move money without being income or spending, so totals and charts
+/// leave them out.
+List<Entry> withoutLoans(List<Entry> list) => list.where((e) => !e.isLoan).toList();
 
 /// Entries for the period before the selected range, for the change
 /// figures on Insights. Empty when the range is unbounded.
@@ -110,7 +116,7 @@ final previousPeriodEntriesProvider = FutureProvider<List<Entry>>((ref) async {
   ref.watch(dataVersionProvider);
   final prev = ref.watch(filterProvider).effectiveRange().previous();
   if (prev == null) return const [];
-  return ref.watch(repositoryProvider).entries(EntryFilter(preset: DatePreset.custom, range: prev));
+  return withoutLoans(await ref.watch(repositoryProvider).entries(EntryFilter(preset: DatePreset.custom, range: prev)));
 });
 
 final pendingImportsProvider = FutureProvider<List<PendingImport>>((ref) {
@@ -160,9 +166,19 @@ final importFlagsProvider = FutureProvider<Map<int, List<ImportFlag>>>((ref) asy
 });
 
 /// Every entry, for year-by-year reports.
-final allEntriesProvider = FutureProvider<List<Entry>>((ref) {
+final allEntriesProvider = FutureProvider<List<Entry>>((ref) async {
   ref.watch(dataVersionProvider);
-  return ref.watch(repositoryProvider).entries(const EntryFilter(preset: DatePreset.allTime));
+  return withoutLoans(await ref.watch(repositoryProvider).entries(const EntryFilter(preset: DatePreset.allTime)));
+});
+
+final loansProvider = FutureProvider<List<Loan>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).loans();
+});
+
+final loanEntriesProvider = FutureProvider<List<Entry>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).loanEntries();
 });
 
 final investmentsProvider = FutureProvider<List<Investment>>((ref) {

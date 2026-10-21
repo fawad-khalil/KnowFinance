@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:know_finance/data/app_database.dart';
 import 'package:know_finance/data/finance_repository.dart';
+import 'package:know_finance/data/sample_data.dart';
 import 'package:know_finance/models/entry.dart';
 import 'package:know_finance/models/entry_filter.dart';
 import 'package:know_finance/models/enums.dart';
 import 'package:know_finance/models/investment.dart';
+import 'package:know_finance/models/loan.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -128,5 +130,48 @@ void main() {
     final all = await repo.entries(const EntryFilter(preset: DatePreset.allTime));
     expect(all.single.investmentId, isNull);
     expect(await repo.investments(), isEmpty);
+  });
+
+  test('loan entries move to the hidden Loan type and back out of the loan', () async {
+    final groceries = await categoryId('Groceries');
+    final id = await repo.saveEntry(expense(groceries, 25000, DateTime(2026, 10, 1), 'Ali'));
+    expect((await repo.categories()).any((c) => c.isSystem), isFalse, reason: 'pickers never offer it');
+
+    final loan = await repo.saveLoan(const Loan(name: 'Ali', direction: LoanDirection.receivable));
+    final e = (await repo.unlinkedLoanCandidates()).firstWhere((x) => x.id == id);
+    await repo.linkLoanEntries(loan, [e]);
+    final linked = (await repo.loanEntries()).single;
+    expect(linked.loanId, loan);
+    expect(linked.categoryId, await repo.loanCategoryId(EntryKind.expense));
+
+    await repo.deleteLoan(loan);
+    expect(await repo.loanEntries(), isEmpty);
+    expect(await repo.loans(), isEmpty);
+  });
+
+  test('sample data loads, and clearing removes it', () async {
+    await seedSampleData(repo, now: DateTime(2026, 10, 21));
+    final all = await repo.entries(const EntryFilter(preset: DatePreset.allTime));
+    expect(all.length, greaterThan(300));
+    expect(all.every((e) => !e.date.isAfter(DateTime(2026, 10, 21))), isTrue);
+    expect(await repo.investments(), hasLength(5));
+    expect(await repo.loans(), hasLength(3));
+    expect(await repo.pendingImportCount(), sampleAlerts.length);
+
+    await repo.clearAll();
+    expect(await repo.entries(const EntryFilter(preset: DatePreset.allTime)), isEmpty);
+    expect(await repo.investments(), isEmpty);
+    expect(await repo.categories(), isNotEmpty);
+  });
+
+  test('sample SMS can be put back in the inbox after being added', () async {
+    final now = DateTime(2026, 10, 21);
+    expect(await seedSampleImports(repo, now: now), sampleAlerts.length);
+    for (final p in await repo.pendingImports()) {
+      await repo.ignoreImport(p.id);
+    }
+    expect(await repo.pendingImportCount(), 0);
+    expect(await seedSampleImports(repo, now: now), sampleAlerts.length);
+    expect(await repo.pendingImportCount(), sampleAlerts.length);
   });
 }

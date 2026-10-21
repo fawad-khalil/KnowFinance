@@ -6,6 +6,7 @@ import '../../models/category.dart';
 import '../../models/entry.dart';
 import '../../models/enums.dart';
 import '../../services/pivot.dart';
+import '../widgets/trend_chip.dart';
 import '../../state/providers.dart';
 
 /// Year-by-year totals and a pivot table for slicing income or expenses
@@ -62,7 +63,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               ),
               _Card(
                 title: 'Year by year',
-                subtitle: 'Amounts in $home',
+                subtitle: 'Amounts in $home. Arrows compare the monthly average with the year before.',
                 child: _YearTable(summaries: yearSummaries(entries, cats, home), highlight: _year),
               ),
               _Card(
@@ -273,7 +274,7 @@ class _YearTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
-    final headings = ['Year', 'Income', 'Needs', 'Wants', 'Savings', 'Expenses', 'Net', 'Kept', 'Avg / month'];
+    final headings = ['Year', 'Income', 'Needs', 'Wants', 'To savings', 'Expenses', 'Net', 'Savings %', 'Avg / month'];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
@@ -287,24 +288,41 @@ class _YearTable extends StatelessWidget {
             DataColumn(label: Text(headings[i], style: muted), numeric: i > 0),
         ],
         rows: [
-          for (final y in summaries)
-            DataRow(
-              selected: y.year == highlight,
-              cells: [
-                DataCell(Text('${y.year}', style: const TextStyle(fontWeight: FontWeight.w600))),
-                DataCell(Text(_num.format(y.income))),
-                DataCell(Text(_num.format(y.buckets[Bucket.needs]))),
-                DataCell(Text(_num.format(y.buckets[Bucket.wants]))),
-                DataCell(Text(_num.format(y.buckets[Bucket.savings]))),
-                DataCell(Text(_num.format(y.expense))),
-                DataCell(Text(
-                  _num.format(y.net),
-                  style: y.net < 0 ? TextStyle(color: theme.colorScheme.error) : null,
-                )),
-                DataCell(Text(y.keptPct == null ? '–' : '${y.keptPct!.toStringAsFixed(0)}%')),
-                DataCell(Text(_num.format(y.avgMonthlyExpense))),
-              ],
-            ),
+          for (final (i, y) in summaries.indexed)
+            () {
+              // The year before, when it is in the list (newest first).
+              final prev = i + 1 < summaries.length && summaries[i + 1].year == y.year - 1 ? summaries[i + 1] : null;
+              // Monthly averages, so a part year compares fairly with a full one.
+              double perMonth(YearSummary s, double v) => s.months == 0 ? 0 : v / s.months;
+              DataCell money(double v, double Function(YearSummary) of, {bool upIsGood = true, TextStyle? style}) {
+                final before = prev == null ? null : perMonth(prev, of(prev));
+                final now = perMonth(y, v);
+                final change = before == null || before == 0 ? null : (now - before) / before.abs() * 100;
+                return DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(_num.format(v), style: style),
+                  if (change != null) ...[const SizedBox(width: 4), TrendChip(value: change, upIsGood: upIsGood, dense: true)],
+                ]));
+              }
+
+              final pts = y.keptPct != null && prev?.keptPct != null ? y.keptPct! - prev!.keptPct! : null;
+              return DataRow(
+                selected: y.year == highlight,
+                cells: [
+                  DataCell(Text('${y.year}', style: const TextStyle(fontWeight: FontWeight.w600))),
+                  money(y.income, (s) => s.income),
+                  money(y.buckets[Bucket.needs]!, (s) => s.buckets[Bucket.needs]!, upIsGood: false),
+                  money(y.buckets[Bucket.wants]!, (s) => s.buckets[Bucket.wants]!, upIsGood: false),
+                  money(y.buckets[Bucket.savings]!, (s) => s.buckets[Bucket.savings]!),
+                  money(y.expense, (s) => s.expense, upIsGood: false),
+                  money(y.net, (s) => s.net, style: y.net < 0 ? TextStyle(color: theme.colorScheme.error) : null),
+                  DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(y.keptPct == null ? '–' : '${y.keptPct!.toStringAsFixed(0)}%'),
+                    if (pts != null) ...[const SizedBox(width: 4), TrendChip(value: pts, suffix: ' pts', dense: true)],
+                  ])),
+                  DataCell(Text(_num.format(y.avgMonthlyExpense))),
+                ],
+              );
+            }(),
         ],
       ),
     );

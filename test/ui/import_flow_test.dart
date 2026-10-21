@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:know_finance/data/app_database.dart';
+import 'package:know_finance/data/finance_repository.dart';
 import 'package:know_finance/main.dart';
+import 'package:know_finance/models/enums.dart';
+import 'package:know_finance/models/loan.dart';
 import 'package:know_finance/models/entry_filter.dart';
 import 'package:know_finance/state/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -118,6 +121,56 @@ void main() {
     await settle();
     expect(find.text('1 to review'), findsOneWidget);
     expect(find.textContaining('Possible duplicate'), findsNothing);
+    await tester.runAsync(db.close);
+  });
+
+  testWidgets('an alert naming a loan contact is set as a loan and left out of Add all', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.6;
+    late AppDatabase db;
+    late SharedPreferences prefs;
+    await tester.runAsync(() async {
+      db = await AppDatabase.open(factory: databaseFactoryFfi, path: inMemoryDatabasePath);
+      await FinanceRepository(db).saveLoan(const Loan(name: 'Ali Khan', direction: LoanDirection.receivable));
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+    });
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        preferencesProvider.overrideWithValue(prefs),
+      ],
+      child: const KnowFinanceApp(),
+    ));
+    Future<void> settle() async {
+      for (var i = 0; i < 6; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    await settle();
+    await tester.tap(find.byTooltip('Import transactions'));
+    await settle();
+    await tester.tap(find.text('Paste SMS or email'));
+    await settle();
+    await tester.enterText(find.byType(TextField).last, 'Rs 20,000 received from Ali Khan in your account on 18-Oct-26.');
+    await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+    await settle();
+    await settle();
+
+    expect(find.textContaining('Got back'), findsOneWidget);
+    await tester.tap(find.text('Add all'));
+    await settle();
+    await settle();
+    expect(find.text('1 to review'), findsOneWidget, reason: 'the loan card waits to be added by hand');
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+    await settle();
+    await settle();
+    final container = ProviderScope.containerOf(tester.element(find.byType(KnowFinanceApp)));
+    final linked = await tester.runAsync(() => container.read(repositoryProvider).loanEntries());
+    expect(linked!.single.amount, 20000);
     await tester.runAsync(db.close);
   });
 }

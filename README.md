@@ -17,7 +17,19 @@ Logging:
 - Filters for date range, income/expense, bucket and note text (case-insensitive)
 - Everything is stored on the device (SQLite)
 
-Insights (follows the selected date range):
+Changes against an earlier month, period or year show an arrow in the
+direction the number moved, green when that is good (income or savings up,
+spending down) and red when it is not.
+
+Insights:
+
+- This month so far: how much was saved (income minus Needs and Wants) and
+  its share of income; income and spending against the same days of last
+  month, with the % change and whether spending is growing faster than
+  income; loan money that moved this month, kept apart
+- Savings: every month's balance added up. Months with money left over add
+  to savings, short months draw from it; a bar per month for the last year
+- The rest follows the selected date range:
 
 - Headline cards for income, expenses, net and share kept, each with the
   change from the period before (month-to-date compares with the same days
@@ -62,10 +74,29 @@ Assets & investments (Assets tab):
   A sale's cost is its units at the average buy price, or for a closed
   asset counted without units, its share of everything put in
 
+Loans (Assets tab › Loans):
+
+- Payables (money you borrowed) and receivables (money you lent), each with
+  who it is with, an optional due date and a note
+- Imported alerts can be added as a loan too: each review card has a Loan
+  switch, turned on by itself when the alert names someone you have a loan
+  with
+- Turn on "This is a loan" when adding an entry and pick the loan: money in
+  is borrowed (payable) or got back (receivable), money out is repaid or
+  lent. Existing entries can be linked from the loan's page; ones whose
+  note mentions the loan are ticked
+- Loan money is never income or spending: it is left out of Insights,
+  Reports, savings and the Entries totals, which show it on its own line
+- Per loan: borrowed or lent, paid back, what is left, progress, overdue
+  and overpaid, and every payment with the balance after it. Totals for
+  what you owe, what you are owed and the net. Interest is spending: log it
+  as a separate expense
+
 Reports:
 
-- Year by year: income, Needs, Wants, Savings, expenses, net, share kept
-  and average monthly spend
+- Year by year: income, Needs, Wants, money put into Savings types,
+  expenses, net, savings % and average monthly spend, each with an arrow
+  against the year before (monthly averages, so a part year compares fairly)
 - Pivot table for expenses or income: rows by bucket, type, note, source,
   currency, year or month; columns by year, quarter, month or bucket;
   showing totals, counts, averages or % of total, for all years or one year
