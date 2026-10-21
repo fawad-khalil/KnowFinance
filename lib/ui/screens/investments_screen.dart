@@ -11,6 +11,7 @@ import '../../state/providers.dart';
 import '../chart_colors.dart';
 import '../widgets/breakdown_pie.dart';
 import '../widgets/signed_bars.dart';
+import '../widgets/trend_chip.dart';
 import 'investment_detail_screen.dart';
 import 'loans_screen.dart';
 
@@ -595,7 +596,7 @@ String signedMoney(double v, String currency, {bool compact = false}) {
   return '${v >= 0 ? '+' : '−'}$s';
 }
 
-/// A small green or red pill showing a percentage.
+/// A small green or red pill with an arrow, showing a percentage.
 class ChangeChip extends StatelessWidget {
   const ChangeChip({super.key, required this.value, this.suffix = '%'});
 
@@ -603,18 +604,10 @@ class ChangeChip extends StatelessWidget {
   final String suffix;
 
   @override
-  Widget build(BuildContext context) {
-    final color = plColor(context, value);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
-      child: Text(
-        '${value >= 0 ? '+' : '−'}${value.abs().toStringAsFixed(1)}$suffix',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: TrendChip(value: value, suffix: suffix),
+      );
 }
 
 class StatTile extends StatelessWidget {

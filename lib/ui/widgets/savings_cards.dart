@@ -9,6 +9,7 @@ import '../../state/providers.dart';
 import '../screens/investments_screen.dart' show plColor, signedMoney;
 import '../screens/loans_screen.dart';
 import 'signed_bars.dart';
+import 'trend_chip.dart';
 
 /// Savings figures for this month and the months before. They don't follow
 /// the date filter: "this month" always means the calendar month so far.
@@ -141,8 +142,7 @@ class _ChangeRow extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: c == null
                   ? Text('–', style: theme.textTheme.bodySmall)
-                  // The chip colours by sign; flip it when up is bad.
-                  : _signChip(context, c, upIsGood),
+                  : TrendChip(value: c, upIsGood: upIsGood),
             ),
           ),
         ],
@@ -150,22 +150,6 @@ class _ChangeRow extends StatelessWidget {
     );
   }
 
-  static Widget _signChip(BuildContext context, double c, bool upIsGood) {
-    final good = (c >= 0) == upIsGood;
-    final color = c.abs() < 0.5
-        ? Theme.of(context).colorScheme.onSurfaceVariant
-        : good
-            ? Colors.green.shade600
-            : Theme.of(context).colorScheme.error;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
-      child: Text(
-        '${c >= 0 ? '+' : '−'}${c.abs().toStringAsFixed(1)}%',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
 }
 
 /// Every month's balance added into savings: months with money left over

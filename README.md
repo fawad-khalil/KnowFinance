@@ -17,6 +17,10 @@ Logging:
 - Filters for date range, income/expense, bucket and note text (case-insensitive)
 - Everything is stored on the device (SQLite)
 
+Changes against an earlier month, period or year show an arrow in the
+direction the number moved, green when that is good (income or savings up,
+spending down) and red when it is not.
+
 Insights:
 
 - This month so far: how much was saved (income minus Needs and Wants) and
@@ -90,8 +94,9 @@ Loans (Assets tab › Loans):
 
 Reports:
 
-- Year by year: income, Needs, Wants, Savings, expenses, net, share kept
-  and average monthly spend
+- Year by year: income, Needs, Wants, money put into Savings types,
+  expenses, net, savings % and average monthly spend, each with an arrow
+  against the year before (monthly averages, so a part year compares fairly)
 - Pivot table for expenses or income: rows by bucket, type, note, source,
   currency, year or month; columns by year, quarter, month or bucket;
   showing totals, counts, averages or % of total, for all years or one year
