@@ -137,12 +137,13 @@ class _ChangeRow extends StatelessWidget {
           Text(value, style: theme.textTheme.titleSmall),
           const SizedBox(width: 8),
           SizedBox(
-            width: 78,
+            width: 96,
             child: Align(
               alignment: Alignment.centerRight,
               child: c == null
                   ? Text('–', style: theme.textTheme.bodySmall)
-                  : TrendChip(value: c, upIsGood: upIsGood),
+                  // Large swings (+213%) still fit.
+                  : FittedBox(fit: BoxFit.scaleDown, child: TrendChip(value: c, upIsGood: upIsGood)),
             ),
           ),
         ],

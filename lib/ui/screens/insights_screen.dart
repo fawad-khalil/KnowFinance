@@ -318,7 +318,14 @@ class _Kpi extends StatelessWidget {
             ch == null
                 ? Text('No earlier period', style: muted)
                 : Row(children: [
-                    TrendChip(value: ch.$1, suffix: ch.$2 ? ' pts' : '%', upIsGood: upIsGood),
+                    Flexible(
+                      flex: 2,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: TrendChip(value: ch.$1, suffix: ch.$2 ? ' pts' : '%', upIsGood: upIsGood),
+                      ),
+                    ),
                     const SizedBox(width: 6),
                     Flexible(child: Text('vs previous', style: muted, overflow: TextOverflow.ellipsis)),
                   ]),
