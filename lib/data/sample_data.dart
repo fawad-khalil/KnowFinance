@@ -138,18 +138,27 @@ Future<void> seedSampleData(FinanceRepository repo, {DateTime? now, bool withImp
   await add('', 15000, monthsAgo(8, 1), 'Sara', EntryKind.expense, loan: sara);
   await add('', 15000, monthsAgo(7, 1), 'Sara', EntryKind.income, loan: sara);
 
-  if (withImports) {
-    String fmt(DateTime d) =>
-        '${d.day.toString().padLeft(2, '0')}-${const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.month - 1]}-${d.year}';
-    String num(DateTime d) => '${d.day}-${d.month}-${d.year % 100}';
-    final d1 = today, d2 = today.subtract(const Duration(days: 1)), d3 = today.subtract(const Duration(days: 2));
-    const parser = AlertParser();
-    await repo.addImports([
-      for (final a in sampleAlerts)
-        ?parser.parse(
-          a.replaceAll('{d1}', fmt(d1)).replaceAll('{d2}', fmt(d2)).replaceAll('{d3}', num(d3)),
-          receivedAt: today.add(const Duration(hours: 23)),
-        ),
-    ]);
-  }
+  if (withImports) await seedSampleImports(repo, now: today);
+}
+
+/// Puts the sample bank alerts into the import inbox, dated around today,
+/// without touching anything else. Earlier inbox records of the same alerts
+/// are cleared first so they show up again; entries made from them stay.
+Future<int> seedSampleImports(FinanceRepository repo, {DateTime? now}) async {
+  final n = now ?? DateTime.now();
+  final today = DateTime(n.year, n.month, n.day);
+  String fmt(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}-${const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.month - 1]}-${d.year}';
+  String num(DateTime d) => '${d.day}-${d.month}-${d.year % 100}';
+  final d1 = today, d2 = today.subtract(const Duration(days: 1)), d3 = today.subtract(const Duration(days: 2));
+  const parser = AlertParser();
+  final parsed = [
+    for (final a in sampleAlerts)
+      ?parser.parse(
+        a.replaceAll('{d1}', fmt(d1)).replaceAll('{d2}', fmt(d2)).replaceAll('{d3}', num(d3)),
+        receivedAt: today.add(const Duration(hours: 23)),
+      ),
+  ];
+  await repo.forgetImports(parsed.map((t) => t.fingerprint));
+  return repo.addImports(parsed);
 }

@@ -312,4 +312,12 @@ class FinanceRepository {
           await txn.delete(t);
         }
       });
+
+  /// Drops inbox records with these fingerprints, whatever their status, so
+  /// the same alerts can be imported again. Entries made from them stay.
+  Future<void> forgetImports(Iterable<String> fingerprints) => _db.transaction((txn) async {
+        for (final f in fingerprints) {
+          await txn.delete('imports', where: 'fingerprint = ?', whereArgs: [f]);
+        }
+      });
 }

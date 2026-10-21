@@ -96,6 +96,18 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: const Text('Debug builds only'),
               onTap: () => _loadSample(context, ref),
             ),
+          if (kDebugMode)
+            ListTile(
+              leading: const Icon(Icons.sms_outlined),
+              title: const Text('Add sample SMS to import'),
+              subtitle: const Text('Debug builds only. Leaves your entries as they are'),
+              onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final added = await seedSampleImports(ref.read(repositoryProvider));
+                ref.read(dataVersionProvider.notifier).bump();
+                messenger.showSnackBar(SnackBar(content: Text('$added sample alerts added to the import inbox.')));
+              },
+            ),
           SwitchListTile(
             secondary: const Icon(Icons.lightbulb_outline),
             title: const Text('Feedback button'),

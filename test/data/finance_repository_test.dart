@@ -163,4 +163,15 @@ void main() {
     expect(await repo.investments(), isEmpty);
     expect(await repo.categories(), isNotEmpty);
   });
+
+  test('sample SMS can be put back in the inbox after being added', () async {
+    final now = DateTime(2026, 10, 21);
+    expect(await seedSampleImports(repo, now: now), sampleAlerts.length);
+    for (final p in await repo.pendingImports()) {
+      await repo.ignoreImport(p.id);
+    }
+    expect(await repo.pendingImportCount(), 0);
+    expect(await seedSampleImports(repo, now: now), sampleAlerts.length);
+    expect(await repo.pendingImportCount(), sampleAlerts.length);
+  });
 }
