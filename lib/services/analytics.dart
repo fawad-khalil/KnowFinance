@@ -65,8 +65,8 @@ class SavingsSummary {
 /// the current home currency are counted; the rest are reported as [skipped].
 class Analytics {
   Analytics(List<Entry> all, this.categories, this.home)
-      : entries = all.where((e) => e.homeCurrency == home && e.fxRate != null).toList(),
-        skipped = all.where((e) => e.homeCurrency != home || e.fxRate == null).length;
+      : entries = all.where((e) => !e.isLoan && e.homeCurrency == home && e.fxRate != null).toList(),
+        skipped = all.where((e) => !e.isLoan && (e.homeCurrency != home || e.fxRate == null)).length;
 
   final List<Entry> entries;
   final Map<int, Category> categories;

@@ -8,9 +8,11 @@ import '../../models/currency.dart';
 import '../../models/entry.dart';
 import '../../models/enums.dart';
 import '../../models/investment.dart';
+import '../../models/loan.dart';
 import '../../services/investment_analytics.dart';
 import '../../services/price_service.dart';
 import 'investments_screen.dart' show formatQuantity;
+import 'loans_screen.dart' show LoanForm;
 import '../../state/providers.dart';
 
 class EntryFormScreen extends ConsumerStatefulWidget {
@@ -33,6 +35,11 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   late DateTime _date;
   int? _categoryId;
   int? _investmentId;
+
+  /// Borrowed, repaid, lent or got back: money that is neither income nor
+  /// spending, kept against a loan instead.
+  var _isLoan = false;
+  int? _loanId;
   InvestmentFlow? _flow;
 
   /// Set once the user picks an investment themselves, so a matching note
@@ -57,6 +64,8 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     _date = e?.date ?? DateTime.now();
     _categoryId = e?.categoryId;
     _investmentId = e?.investmentId;
+    _isLoan = e?.loanId != null;
+    _loanId = e?.loanId;
     _flow = e?.investmentFlow;
     _investmentTouched = e?.investmentId != null;
     if (e?.quantity != null) _qty.text = formatQuantity(e!.quantity!);
@@ -140,6 +149,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     final amount = double.parse(_amount.text.replaceAll(',', ''));
     final rate = _currency == _home ? 1.0 : double.tryParse(_rate.text);
     final base = widget.entry;
+    final loanCategory = _isLoan ? await ref.read(repositoryProvider).loanCategoryId(_kind) : null;
     final entry = Entry(
       id: base?.id,
       kind: _kind,
@@ -147,13 +157,14 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
       currency: _currency,
       homeCurrency: _home,
       fxRate: rate,
-      categoryId: _categoryId!,
+      categoryId: loanCategory ?? _categoryId!,
       date: _date,
       note: _note.text.trim(),
       source: base?.source ?? EntrySource.manual,
-      investmentId: _investmentId,
-      investmentFlow: _investmentId == null ? null : (_flow ?? InvestmentFlow.defaultFor(_kind)),
-      quantity: _investment?.unit == null ? null : double.tryParse(_qty.text),
+      investmentId: _isLoan ? null : _investmentId,
+      investmentFlow: _isLoan || _investmentId == null ? null : (_flow ?? InvestmentFlow.defaultFor(_kind)),
+      quantity: _isLoan || _investment?.unit == null ? null : double.tryParse(_qty.text),
+      loanId: _isLoan ? _loanId : null,
     );
     await ref.read(repositoryProvider).saveEntry(entry);
     ref.read(dataVersionProvider.notifier).bump();
@@ -164,14 +175,17 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   Widget build(BuildContext context) {
     final home = ref.watch(homeCurrencyProvider);
     final all = ref.watch(categoriesProvider).value ?? const <Category>[];
-    final cats = all.where((c) => c.kind == _kind && (!c.archived || c.id == _categoryId)).toList();
+    final cats = all.where((c) => c.kind == _kind && !c.isSystem && (!c.archived || c.id == _categoryId)).toList();
     if (_categoryId != null && !cats.any((c) => c.id == _categoryId)) _categoryId = null;
     final notes = ref.watch(recentNotesProvider).value ?? const <String>[];
     final foreign = _currency != home;
     final investments = ref.watch(investmentsProvider).value ?? const <Investment>[];
     final category = all.where((c) => c.id == _categoryId).firstOrNull;
     // Buying goes in Savings; returns can be any income type.
-    final showInvestment = investments.isNotEmpty &&
+    final loans = ref.watch(loansProvider).value ?? const <Loan>[];
+    final loan = loans.where((l) => l.id == _loanId).firstOrNull;
+    final showInvestment = !_isLoan &&
+        investments.isNotEmpty &&
         (_investmentId != null || _kind == EntryKind.income || category?.bucket == Bucket.savings);
 
     return Scaffold(
@@ -262,6 +276,50 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                 },
               ),
             ],
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('This is a loan'),
+              subtitle: const Text('Money borrowed or lent, or paid back. Kept out of income and spending.'),
+              value: _isLoan,
+              onChanged: (v) => setState(() => _isLoan = v),
+            ),
+            if (_isLoan) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                key: ValueKey('loan-$_loanId-${loans.length}'),
+                initialValue: _loanId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Loan', border: OutlineInputBorder()),
+                items: [
+                  for (final l in loans)
+                    DropdownMenuItem(value: l.id, child: Text('${l.name}  ·  ${l.direction.short}')),
+                  const DropdownMenuItem(value: -1, child: Text('New loan…')),
+                ],
+                onChanged: (v) async {
+                  if (v != -1) return setState(() => _loanId = v);
+                  // Money coming in usually starts a loan you took; going out, one you gave.
+                  final id = await LoanForm.open(context,
+                      direction: _kind == EntryKind.income ? LoanDirection.payable : LoanDirection.receivable);
+                  if (mounted) setState(() => _loanId = id);
+                },
+                validator: (v) => v == null || v == -1 ? 'Pick or add a loan' : null,
+              ),
+              if (loan != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Text(
+                    '${loan.direction.flowLabel(_kind)}: ${switch ((loan.direction, _kind)) {
+                      (LoanDirection.payable, EntryKind.income) => 'adds to what you owe.',
+                      (LoanDirection.payable, EntryKind.expense) => 'brings down what you owe.',
+                      (LoanDirection.receivable, EntryKind.expense) => 'adds to what you are owed.',
+                      (LoanDirection.receivable, EntryKind.income) => 'brings down what you are owed.',
+                    }} Interest or fees are spending: log them as a separate expense.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+            ],
+            if (!_isLoan) ...[
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
               key: ValueKey(_kind),
@@ -281,6 +339,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
               onChanged: (v) => setState(() => _categoryId = v),
               validator: (v) => v == null ? 'Pick a type' : null,
             ),
+            ],
             if (showInvestment) ...[
               const SizedBox(height: 16),
               DropdownButtonFormField<int?>(

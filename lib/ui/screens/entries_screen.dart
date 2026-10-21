@@ -92,8 +92,14 @@ class _Summary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var income = 0.0, expense = 0.0, missing = 0;
+    var loansIn = 0.0, loansOut = 0.0;
     for (final e in entries) {
       final amt = e.homeCurrency == home ? e.homeAmount : null;
+      // Loans are neither income nor spending; shown on their own line.
+      if (e.isLoan) {
+        if (amt != null) e.kind == EntryKind.income ? loansIn += amt : loansOut += amt;
+        continue;
+      }
       if (amt == null) {
         missing++;
         continue;
@@ -128,6 +134,13 @@ class _Summary extends StatelessWidget {
               cell('Expenses', expense, theme.colorScheme.error),
               cell('Net', income - expense, null),
             ]),
+            if (loansIn > 0 || loansOut > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Loans, not counted above: ${formatMoney(loansIn, home)} in, ${formatMoney(loansOut, home)} out',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
             if (missing > 0) ...[
               const SizedBox(height: 8),
               Text(
@@ -162,7 +175,11 @@ class _EntryTile extends ConsumerWidget {
     final investment = entry.investmentId == null
         ? null
         : ref.watch(investmentsProvider).value?.where((i) => i.id == entry.investmentId).firstOrNull;
+    final loan = entry.loanId == null
+        ? null
+        : ref.watch(loansProvider).value?.where((l) => l.id == entry.loanId).firstOrNull;
     final subtitle = [
+      if (loan != null) '${loan.direction.flowLabel(entry.kind)}: ${loan.name}',
       if (cat?.bucket != null) cat!.bucket!.label,
       if (investment != null) '${(entry.investmentFlow ?? InvestmentFlow.defaultFor(entry.kind)).label}: ${investment.name}',
       if (entry.note.isNotEmpty) entry.note,

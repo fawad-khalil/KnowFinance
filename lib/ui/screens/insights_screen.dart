@@ -8,6 +8,7 @@ import '../../state/providers.dart';
 import '../chart_colors.dart';
 import '../widgets/activity_heatmap.dart';
 import '../widgets/breakdown_pie.dart';
+import '../widgets/savings_cards.dart';
 import '../widgets/filter_bar.dart';
 import '../widgets/trend_chart.dart';
 
@@ -49,6 +50,11 @@ class InsightsScreen extends ConsumerWidget {
                           style: TextStyle(color: Theme.of(context).colorScheme.error),
                         ),
                       ),
+                    const ThisMonthCard(),
+                    const SavingsHistoryCard(),
+                    const SizedBox(height: 12),
+                    Text('Selected period', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 4),
                     _KpiGrid(
                       current: a.savings(),
                       previous: range.previous() == null || previous == null ? null : Analytics(previous, cats, home).savings(),

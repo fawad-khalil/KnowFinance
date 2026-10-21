@@ -13,6 +13,7 @@ import 'package:know_finance/models/entry.dart';
 import 'package:know_finance/models/entry_filter.dart';
 import 'package:know_finance/models/enums.dart';
 import 'package:know_finance/models/investment.dart';
+import 'package:know_finance/models/loan.dart';
 import 'package:know_finance/state/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -35,7 +36,7 @@ void main() {
   sqfliteFfiInit();
 
   for (final (tab, dark) in [
-    for (final t in ['Insights', 'Assets', 'Gold', 'Reports']) ...[(t, false), (t, true)],
+    for (final t in ['Insights', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
   ]) {
     testWidgets('$tab screenshot ${dark ? 'dark' : 'light'}', skip: _dir == null, (tester) async {
       tester.view.physicalSize = const Size(1080, 7600);
@@ -63,10 +64,23 @@ void main() {
             marketPrice: 5600, marketCurrency: 'PKR', marketPriceOn: DateTime(2026, 10, 19)));
         final land = await repo.saveInvestment(const Investment(name: 'Farm land', type: AssetType.property));
         Future<void> add(String cat, double amt, DateTime d, String note, EntryKind k,
-                {int? inv, InvestmentFlow? flow, double? qty}) =>
+                {int? inv, InvestmentFlow? flow, double? qty, int? loan}) async =>
             repo.saveEntry(Entry(
               kind: k, amount: amt, currency: 'PKR', homeCurrency: 'PKR', fxRate: 1,
-              categoryId: cats[cat]!, date: d, note: note, investmentId: inv, investmentFlow: flow, quantity: qty));
+              categoryId: loan != null ? await repo.loanCategoryId(k) : cats[cat]!, date: d, note: note,
+              investmentId: inv, investmentFlow: flow, quantity: qty, loanId: loan));
+        // Loans: a car loan being paid off, money lent to a friend, one settled.
+        final car = await repo.saveLoan(Loan(name: 'Car loan (Meezan)', direction: LoanDirection.payable, dueDate: DateTime(2028, 6, 1)));
+        final ali = await repo.saveLoan(const Loan(name: 'Ali', direction: LoanDirection.receivable));
+        final sara = await repo.saveLoan(const Loan(name: 'Sara', direction: LoanDirection.receivable));
+        await add('', 1200000, DateTime(2025, 6, 1), 'Car loan', EntryKind.income, loan: car);
+        for (var m = 7; m <= 22; m++) {
+          await add('', 40000, DateTime(2025, m, 5), 'Car loan instalment', EntryKind.expense, loan: car);
+        }
+        await add('', 50000, DateTime(2026, 5, 10), 'Ali', EntryKind.expense, loan: ali);
+        await add('', 20000, DateTime(2026, 9, 12), 'Ali', EntryKind.income, loan: ali);
+        await add('', 15000, DateTime(2026, 2, 1), 'Sara', EntryKind.expense, loan: sara);
+        await add('', 15000, DateTime(2026, 3, 1), 'Sara', EntryKind.income, loan: sara);
         await add('Investments', 5000000, DateTime(2025, 5, 3), 'DHA plot', EntryKind.expense, inv: plot, flow: InvestmentFlow.buy);
         await add('Investments', 150000, DateTime(2025, 5, 4), 'DHA plot transfer fee', EntryKind.expense, inv: plot, flow: InvestmentFlow.cost);
         await add('Investments', 300000, DateTime(2025, 6, 10), 'PSO shares', EntryKind.expense, inv: shares, flow: InvestmentFlow.buy);
@@ -76,6 +90,17 @@ void main() {
         // without going online. Cached per troy ounce like the real feed.
         await repo.cacheRate('2025-06-02', 'XAU', 'PKR', 280000 * 31.1034768 / 11.6638038);
         await repo.cacheRate('2026-02-08', 'XAU', 'PKR', 372000 * 31.1034768 / 11.6638038);
+        // The last two months, so "this month" has something to compare.
+        final now = DateTime.now();
+        for (final (m, extra) in [(now.month - 1, 0.0), (now.month, 18000.0)]) {
+          final last = m == now.month ? now.day : 28;
+          await add('Salary', 260000, DateTime(now.year, m, 1), 'Xorlogics', EntryKind.income);
+          await add('Rent', 70000, DateTime(now.year, m, 2), 'House rent', EntryKind.expense);
+          await add('Groceries', 32000 + extra, DateTime(now.year, m, 6.clamp(1, last)), 'Imtiaz', EntryKind.expense);
+          await add('Dining out', 9000 + extra, DateTime(now.year, m, 9.clamp(1, last)), 'KFC', EntryKind.expense);
+          await add('Utilities', 21000, DateTime(now.year, m, 10.clamp(1, last)), 'K-Electric', EntryKind.expense);
+          await add('Shopping', 15000 + extra, DateTime(now.year, m, 14.clamp(1, last)), 'Daraz', EntryKind.expense);
+        }
         await add('Investments', 290000, DateTime(2025, 6, 2), 'Gold 1 tola', EntryKind.expense, inv: gold, flow: InvestmentFlow.buy, qty: 1);
         await add('Investments', 195000, DateTime(2026, 2, 8), 'Gold 0.5 tola', EntryKind.expense, inv: gold, flow: InvestmentFlow.buy, qty: 0.5);
         await add('Investments', 42000, DateTime(2025, 8, 9), 'Silver 10 tola', EntryKind.expense, inv: silver, flow: InvestmentFlow.buy, qty: 10);
@@ -118,8 +143,12 @@ void main() {
       }
 
       // "Gold" is the gold asset's own page, opened from the Assets list.
-      await tester.tap(find.text(tab == 'Gold' ? 'Assets' : tab));
+      await tester.tap(find.text(tab == 'Gold' || tab == 'Loans' ? 'Assets' : tab).last);
       await settle();
+      if (tab == 'Loans') {
+        await tester.tap(find.text('Loans').last);
+        await settle();
+      }
       if (tab == 'Gold') {
         await tester.tap(find.widgetWithText(ListTile, 'Gold'));
         await settle();

@@ -294,7 +294,7 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
     final p = widget.item;
     final theme = Theme.of(context);
     final cats = (ref.watch(categoriesProvider).value ?? const <Category>[])
-        .where((c) => c.kind == _kind && !c.archived)
+        .where((c) => c.kind == _kind && !c.archived && !c.isSystem)
         .toList();
     final suggester = ref.watch(categorySuggesterProvider).value;
     if (!_touched && _categoryId == null && suggester != null) {

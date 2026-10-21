@@ -32,6 +32,29 @@ enum EntrySource {
       EntrySource.values.firstWhere((s) => s.name == name);
 }
 
+/// A payable is money the user borrowed and owes back; a receivable is
+/// money the user lent and is owed.
+enum LoanDirection {
+  payable('I borrowed', 'Payable'),
+  receivable('I lent', 'Receivable');
+
+  const LoanDirection(this.label, this.short);
+  final String label;
+  final String short;
+
+  /// The kind of entry that starts the loan: borrowing brings money in,
+  /// lending sends it out.
+  EntryKind get openingKind => this == payable ? EntryKind.income : EntryKind.expense;
+
+  /// What an entry of [kind] does to a loan in this direction.
+  String flowLabel(EntryKind kind) => switch ((this, kind)) {
+        (payable, EntryKind.income) => 'Borrowed',
+        (payable, EntryKind.expense) => 'Repaid',
+        (receivable, EntryKind.expense) => 'Lent',
+        (receivable, EntryKind.income) => 'Got back',
+      };
+}
+
 /// What an entry linked to an investment did to it. Expenses are [buy] or
 /// [cost]; incomes are [sale] or [income].
 enum InvestmentFlow {

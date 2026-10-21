@@ -10,7 +10,9 @@ import '../../services/investment_analytics.dart';
 import '../../state/providers.dart';
 import '../chart_colors.dart';
 import '../widgets/breakdown_pie.dart';
+import '../widgets/signed_bars.dart';
 import 'investment_detail_screen.dart';
+import 'loans_screen.dart';
 
 /// Builds holdings from the investments and their linked entries.
 final investmentAnalyticsProvider = Provider<AsyncValue<InvestmentAnalytics>>((ref) {
@@ -32,6 +34,9 @@ class InvestmentsScreen extends ConsumerStatefulWidget {
 
 class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
   var _refreshing = false;
+
+  /// Assets and investments, or loans (payables and receivables).
+  var _loans = false;
 
   @override
   void initState() {
@@ -65,27 +70,49 @@ class _InvestmentsScreenState extends ConsumerState<InvestmentsScreen> {
     final analytics = ref.watch(investmentAnalyticsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Assets & investments'),
+        title: Text(_loans ? 'Loans' : 'Assets & investments'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: false, label: Text('Assets'), icon: Icon(Icons.trending_up)),
+                ButtonSegment(value: true, label: Text('Loans'), icon: Icon(Icons.handshake_outlined)),
+              ],
+              selected: {_loans},
+              onSelectionChanged: (v) => setState(() => _loans = v.first),
+            ),
+          ),
+        ),
         actions: [
-          _refreshing
-              ? const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                )
-              : IconButton(
-                  tooltip: 'Refresh market prices',
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () => _refresh(force: true),
-                ),
+          if (_loans)
+            const SizedBox.shrink()
+          else if (_refreshing)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            IconButton(
+              tooltip: 'Refresh market prices',
+              icon: const Icon(Icons.refresh),
+              onPressed: () => _refresh(force: true),
+            ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'add-investment',
-        onPressed: () => InvestmentFormSheet.open(context),
+        onPressed: () async {
+          if (!_loans) return InvestmentFormSheet.open(context);
+          final id = await LoanForm.open(context);
+          if (id != null && context.mounted) await LoanDetailScreen.open(context, id);
+        },
         icon: const Icon(Icons.add),
-        label: const Text('Asset'),
+        label: Text(_loans ? 'Loan' : 'Asset'),
       ),
-      body: analytics.when(
+      body: _loans ? const LoansView() : analytics.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Could not load: $e')),
         data: (a) => a.holdings.isEmpty ? const _Empty() : _Portfolio(analytics: a),
@@ -501,7 +528,7 @@ class _BookedCardState extends State<_BookedCard> {
                 StatTile(label: 'Gains on sales', value: signedMoney(gain, home, compact: true)),
               ],
             ),
-            if (timeline.length > 1) ...[const SizedBox(height: 16), _BookedBars(periods: timeline, currency: home)],
+            if (timeline.length > 1) ...[const SizedBox(height: 16), SignedBars(values: [for (final p in timeline) (p.start, p.total)], currency: home)],
             const SizedBox(height: 8),
             for (final b in rows)
               ListTile(
@@ -534,107 +561,6 @@ class _BookedCardState extends State<_BookedCard> {
           ],
         ],
       ),
-    );
-  }
-}
-
-/// Small bar chart of booked profit per month or year; losses go below
-/// the line.
-class _BookedBars extends StatelessWidget {
-  const _BookedBars({required this.periods, required this.currency});
-
-  final List<BookedPeriod> periods;
-  final String currency;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final maxAbs = periods.map((p) => p.total.abs()).fold<double>(0, (a, b) => a > b ? a : b);
-    final hasLoss = periods.any((p) => p.total < 0);
-    final yearly = periods.length > 1 && periods[1].start.month == periods[0].start.month;
-    final fmt = yearly ? DateFormat('yyyy') : DateFormat('MMM');
-    const height = 90.0;
-    final every = (periods.length / 6).ceil().clamp(1, 100);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: hasLoss ? height * 1.6 : height,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final p in periods)
-                Expanded(
-                  child: Tooltip(
-                    message:
-                        '${(yearly ? DateFormat('yyyy') : DateFormat('MMMM yyyy')).format(p.start)}: '
-                        '${signedMoney(p.total, currency)}',
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 1.5),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            flex: 10,
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: FractionallySizedBox(
-                                heightFactor: maxAbs <= 0 || p.total <= 0 ? 0 : p.total / maxAbs,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.shade600,
-                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (hasLoss)
-                            Expanded(
-                              flex: 6,
-                              child: Align(
-                                alignment: Alignment.topCenter,
-                                child: FractionallySizedBox(
-                                  heightFactor: maxAbs <= 0 || p.total >= 0 ? 0 : (-p.total / maxAbs).clamp(0, 1),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.error,
-                                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(3)),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        Divider(height: 1, color: theme.colorScheme.outlineVariant),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: 16,
-          child: Row(
-            children: [
-              for (var i = 0; i < periods.length; i++)
-                Expanded(
-                  child: i % every == 0
-                      ? OverflowBox(
-                          maxWidth: 48,
-                          child: Text(
-                            fmt.format(periods[i].start),
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

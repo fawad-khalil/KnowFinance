@@ -20,6 +20,7 @@ class Entry {
     this.investmentId,
     this.investmentFlow,
     this.quantity,
+    this.loanId,
   });
 
   final int? id;
@@ -42,6 +43,12 @@ class Entry {
   /// How much of the investment this bought or sold, in its unit.
   final double? quantity;
 
+  /// The loan this entry borrowed, repaid, lent or got back. Loan entries
+  /// move money but are neither income nor spending.
+  final int? loanId;
+
+  bool get isLoan => loanId != null;
+
   bool get needsRate => fxRate == null;
 
   /// Amount in the home currency, or null while the rate is missing.
@@ -59,6 +66,7 @@ class Entry {
     int? Function()? investmentId,
     InvestmentFlow? Function()? investmentFlow,
     double? Function()? quantity,
+    int? Function()? loanId,
   }) =>
       Entry(
         id: id,
@@ -74,6 +82,7 @@ class Entry {
         investmentId: investmentId != null ? investmentId() : this.investmentId,
         investmentFlow: investmentFlow != null ? investmentFlow() : this.investmentFlow,
         quantity: quantity != null ? quantity() : this.quantity,
+        loanId: loanId != null ? loanId() : this.loanId,
       );
 
   Map<String, Object?> toMap() => {
@@ -90,6 +99,7 @@ class Entry {
         'investment_id': investmentId,
         'investment_flow': investmentFlow?.name,
         'quantity': quantity,
+        'loan_id': loanId,
       };
 
   factory Entry.fromMap(Map<String, Object?> m) => Entry(
@@ -106,6 +116,7 @@ class Entry {
         investmentId: m['investment_id'] as int?,
         investmentFlow: InvestmentFlow.fromName(m['investment_flow'] as String?),
         quantity: (m['quantity'] as num?)?.toDouble(),
+        loanId: m['loan_id'] as int?,
       );
 }
 

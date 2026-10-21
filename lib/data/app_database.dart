@@ -9,7 +9,7 @@ class AppDatabase {
 
   final Database db;
 
-  static const _version = 4;
+  static const _version = 5;
 
   /// Opens the on-device database. [factory] and [path] let tests use an
   /// in-memory database through sqflite_common_ffi.
@@ -69,15 +69,37 @@ class AppDatabase {
 
     final batch = db.batch();
     for (final c in defaultCategories) {
-      batch.insert('categories', c.toMap()..remove('id'));
+      batch.insert('categories', c.toMap()..remove('id')..remove('system'));
     }
     await batch.commit(noResult: true);
+    // After the defaults, so their ids stay as they were.
+    await _createLoans(db);
   }
 
   static Future<void> _upgrade(Database db, int from, int to) async {
     if (from < 2) await _createImports(db);
     if (from < 3) await _createInvestments(db);
     if (from < 4) await _addQuantities(db);
+    if (from < 5) await _createLoans(db);
+  }
+
+  /// Payables and receivables. Loan entries use the app's own "Loan" types
+  /// so they never show up as income or spending.
+  static Future<void> _createLoans(Database db) async {
+    await db.execute('''
+      CREATE TABLE loans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        due_date TEXT
+      )''');
+    await db.execute('ALTER TABLE entries ADD COLUMN loan_id INTEGER REFERENCES loans(id) ON DELETE SET NULL');
+    await db.execute('CREATE INDEX entries_loan ON entries(loan_id)');
+    await db.execute('ALTER TABLE categories ADD COLUMN system TEXT');
+    for (final kind in EntryKind.values) {
+      await db.insert('categories', {'name': 'Loan', 'kind': kind.name, 'archived': 0, 'system': 'loan'});
+    }
   }
 
   /// Assets counted by amount held (grams, shares, barrels) and priced from
