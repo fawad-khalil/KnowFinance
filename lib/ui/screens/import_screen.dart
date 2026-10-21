@@ -36,6 +36,10 @@ class ImportScreen extends ConsumerStatefulWidget {
 class _ImportScreenState extends ConsumerState<ImportScreen> {
   var _busy = false;
 
+  /// Import ids whose card has the Loan switch on; "Add all" leaves them
+  /// for the user to finish, since they need a loan picked.
+  final _loanCards = <int>{};
+
   ImportService get _service => ref.read(importServiceProvider);
 
   Future<void> _run(Future<ImportResult> Function() job, {String? what}) async {
@@ -102,12 +106,15 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
   Future<void> _acceptAll(List<PendingImport> items) async {
     final suggester = await ref.read(categorySuggesterProvider.future);
     final flags = await ref.read(importFlagsProvider.future);
+    final loans = await ref.read(loansProvider.future);
     final home = ref.read(homeCurrencyProvider);
     setState(() => _busy = true);
     var added = 0, flagged = 0;
     for (final p in items) {
-      // Possible duplicates and own transfers wait for a decision.
-      if (flags[p.id]?.isNotEmpty ?? false) {
+      // Possible duplicates, own transfers and loans wait for a decision.
+      if ((flags[p.id]?.isNotEmpty ?? false) ||
+          _loanCards.contains(p.id) ||
+          loanForCounterparty(p.counterparty, loans) != null) {
         flagged++;
         continue;
       }
@@ -196,7 +203,12 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Text('${items.length} to review', style: Theme.of(context).textTheme.titleSmall),
             ),
-          for (final p in items) _ImportCard(key: ValueKey(p.id), item: p),
+          for (final p in items)
+            _ImportCard(
+              key: ValueKey(p.id),
+              item: p,
+              onLoanChanged: (on) => on ? _loanCards.add(p.id) : _loanCards.remove(p.id),
+            ),
         ],
       ),
     );
@@ -245,9 +257,10 @@ class _PasteDialogState extends State<_PasteDialog> {
 }
 
 class _ImportCard extends ConsumerStatefulWidget {
-  const _ImportCard({super.key, required this.item});
+  const _ImportCard({super.key, required this.item, required this.onLoanChanged});
 
   final PendingImport item;
+  final void Function(bool on) onLoanChanged;
 
   @override
   ConsumerState<_ImportCard> createState() => _ImportCardState();
@@ -313,16 +326,11 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
     // An alert naming someone you have a loan with is most likely that loan.
     if (!_loanGuessed && loans.isNotEmpty) {
       _loanGuessed = true;
-      final who = p.counterparty.toLowerCase().trim();
-      final match = who.isEmpty
-          ? null
-          : loans.where((l) {
-              final n = l.name.toLowerCase();
-              return n.contains(who) || who.contains(n);
-            }).firstOrNull;
+      final match = loanForCounterparty(p.counterparty, loans);
       if (match != null) {
         _isLoan = true;
         _loanId = match.id;
+        widget.onLoanChanged(true);
       }
     }
     final loan = loans.where((l) => l.id == _loanId).firstOrNull;
@@ -391,7 +399,13 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
-                    Switch(value: _isLoan, onChanged: (v) => setState(() => _isLoan = v)),
+                    Switch(
+                      value: _isLoan,
+                      onChanged: (v) {
+                        widget.onLoanChanged(v);
+                        setState(() => _isLoan = v);
+                      },
+                    ),
                   ],
                 ),
                 if (_isLoan)
@@ -496,4 +510,15 @@ class _FlagBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The loan an alert's payee or payer most likely belongs to: one whose
+/// name and the counterparty contain each other, ignoring case.
+Loan? loanForCounterparty(String counterparty, List<Loan> loans) {
+  final who = counterparty.toLowerCase().trim();
+  if (who.isEmpty) return null;
+  return loans.where((l) {
+    final n = l.name.toLowerCase().trim();
+    return n.isNotEmpty && (n.contains(who) || who.contains(n));
+  }).firstOrNull;
 }
