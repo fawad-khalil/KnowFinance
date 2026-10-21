@@ -107,8 +107,12 @@ class ImportService {
     return ImportResult(parsed.length, await _repo.addImports(parsed));
   }
 
-  Future<void> accept(PendingImport p, {required int categoryId, required EntryKind kind, required String note, required String homeCurrency}) async {
+  /// Adds the import as an entry. With [loanId] it goes against that loan
+  /// on the hidden Loan type, and [categoryId] is ignored.
+  Future<void> accept(PendingImport p,
+      {required int? categoryId, required EntryKind kind, required String note, required String homeCurrency, int? loanId}) async {
     final rate = await _fx.rate(p.currency, homeCurrency, p.date);
+    final category = loanId != null ? await _repo.loanCategoryId(kind) : categoryId!;
     await _repo.acceptImport(
       p.id,
       Entry(
@@ -117,10 +121,11 @@ class ImportService {
         currency: p.currency,
         homeCurrency: homeCurrency,
         fxRate: rate,
-        categoryId: categoryId,
+        categoryId: category,
         date: p.date,
         note: note,
         source: p.source,
+        loanId: loanId,
       ),
     );
   }

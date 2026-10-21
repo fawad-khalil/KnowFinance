@@ -74,6 +74,9 @@ Loans (Assets tab › Loans):
 
 - Payables (money you borrowed) and receivables (money you lent), each with
   who it is with, an optional due date and a note
+- Imported alerts can be added as a loan too: each review card has a Loan
+  switch, turned on by itself when the alert names someone you have a loan
+  with
 - Turn on "This is a loan" when adding an entry and pick the loan: money in
   is borrowed (payable) or got back (receivable), money out is repaid or
   lent. Existing entries can be linked from the loan's page; ones whose

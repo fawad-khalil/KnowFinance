@@ -13,6 +13,8 @@ import '../../import/sms_reader.dart';
 import '../../models/category.dart';
 import '../../models/currency.dart';
 import '../../models/enums.dart';
+import '../../models/loan.dart';
+import 'loans_screen.dart' show LoanForm;
 import '../../state/providers.dart';
 
 /// Hidden for now: banks send statements as PDF, and only CSV is read so
@@ -258,6 +260,11 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
   var _showRaw = false;
   late final _note = TextEditingController(text: widget.item.counterparty);
 
+  /// Borrowed, repaid, lent or got back instead of income or spending.
+  var _isLoan = false;
+  int? _loanId;
+  var _loanGuessed = false;
+
   @override
   void dispose() {
     _note.dispose();
@@ -266,7 +273,7 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
 
   Future<void> _accept() async {
     final cat = _categoryId;
-    if (cat == null) return;
+    if (_isLoan ? _loanId == null : cat == null) return;
     await ref
         .read(importServiceProvider)
         .accept(
@@ -275,6 +282,7 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
           kind: _kind,
           note: _note.text.trim(),
           homeCurrency: ref.read(homeCurrencyProvider),
+          loanId: _isLoan ? _loanId : null,
         );
     ref.read(dataVersionProvider.notifier).bump();
   }
@@ -301,6 +309,23 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
       _categoryId = suggester.suggest(_kind, p.counterparty, p.raw);
     }
     if (_categoryId != null && !cats.any((c) => c.id == _categoryId)) _categoryId = null;
+    final loans = ref.watch(loansProvider).value ?? const <Loan>[];
+    // An alert naming someone you have a loan with is most likely that loan.
+    if (!_loanGuessed && loans.isNotEmpty) {
+      _loanGuessed = true;
+      final who = p.counterparty.toLowerCase().trim();
+      final match = who.isEmpty
+          ? null
+          : loans.where((l) {
+              final n = l.name.toLowerCase();
+              return n.contains(who) || who.contains(n);
+            }).firstOrNull;
+      if (match != null) {
+        _isLoan = true;
+        _loanId = match.id;
+      }
+    }
+    final loan = loans.where((l) => l.id == _loanId).firstOrNull;
     final isIncome = _kind == EntryKind.income;
     final flags = ref.watch(importFlagsProvider).value?[p.id] ?? const <ImportFlag>[];
     final ownTransfer = flags.any((f) => f.kind == FlagKind.ownTransfer);
@@ -355,7 +380,40 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
                     _touched = false;
                   }),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _isLoan && loan != null
+                            ? '${loan.direction.flowLabel(_kind)} · not income or spending'
+                            : 'Loan',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    Switch(value: _isLoan, onChanged: (v) => setState(() => _isLoan = v)),
+                  ],
+                ),
+                if (_isLoan)
+                  DropdownButtonFormField<int>(
+                    key: ValueKey('loan-$_loanId-${loans.length}-${p.id}'),
+                    initialValue: _loanId,
+                    isExpanded: true,
+                    isDense: true,
+                    hint: const Text('Pick loan'),
+                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                    items: [
+                      for (final l in loans) DropdownMenuItem(value: l.id, child: Text('${l.name}  ·  ${l.direction.short}')),
+                      const DropdownMenuItem(value: -1, child: Text('New loan…')),
+                    ],
+                    onChanged: (v) async {
+                      if (v != -1) return setState(() => _loanId = v);
+                      final id = await LoanForm.open(context,
+                          direction: _kind == EntryKind.income ? LoanDirection.payable : LoanDirection.receivable);
+                      if (mounted) setState(() => _loanId = id);
+                    },
+                  )
+                else
                 DropdownButtonFormField<int>(
                   key: ValueKey('$_kind-${p.id}'),
                   initialValue: _categoryId,
@@ -394,7 +452,7 @@ class _ImportCardState extends ConsumerState<_ImportCard> {
                 else
                   TextButton(onPressed: _ignore, child: const Text('Ignore')),
                 const SizedBox(width: 4),
-                FilledButton(onPressed: _categoryId == null ? null : _accept, child: const Text('Add')),
+                FilledButton(onPressed: (_isLoan ? _loanId == null : _categoryId == null) ? null : _accept, child: const Text('Add')),
               ],
             ),
           ],
