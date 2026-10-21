@@ -590,7 +590,8 @@ IconData assetIcon(AssetType t) => switch (t) {
 Color plColor(BuildContext context, double v) => v >= 0 ? Colors.green.shade600 : Theme.of(context).colorScheme.error;
 
 String signedMoney(double v, String currency, {bool compact = false}) {
-  final s = compact ? compactMoney(v.abs(), currency) : formatMoney(v.abs(), currency);
+  // Market prices aren't whole numbers; paise in a profit figure is noise.
+  final s = compact ? compactMoney(v.abs(), currency) : formatMoney(v.abs().roundToDouble(), currency);
   return '${v >= 0 ? '+' : '−'}$s';
 }
 

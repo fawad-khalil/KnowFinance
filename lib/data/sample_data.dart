@@ -119,7 +119,7 @@ Future<void> seedSampleData(FinanceRepository repo, {DateTime? now, bool withImp
       inv: shares, flow: InvestmentFlow.income);
   await add('Business', 340000, monthsAgo(7, 15), 'PSO shares sold', EntryKind.income, inv: shares, flow: InvestmentFlow.sale);
   await add('Investments', 355000, monthsAgo(16, 2), 'Gold 1 tola', EntryKind.expense, inv: gold, flow: InvestmentFlow.buy, qty: 1);
-  await add('Investments', 205000, monthsAgo(8, 8), 'Gold 0.5 tola', EntryKind.expense,
+  await add('Investments', 262000, monthsAgo(8, 8), 'Gold 0.5 tola', EntryKind.expense,
       inv: gold, flow: InvestmentFlow.buy, qty: 0.5);
   await add('Investments', 42000, monthsAgo(14, 9), 'Silver 10 tola', EntryKind.expense,
       inv: silver, flow: InvestmentFlow.buy, qty: 10);

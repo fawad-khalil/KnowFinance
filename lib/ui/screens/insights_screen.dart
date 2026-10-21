@@ -62,12 +62,23 @@ class InsightsScreen extends ConsumerWidget {
                     ),
                     _Section(
                       title: 'Transaction activity',
-                      child: ActivityHeatmap(
-                        days: a.daily(),
-                        start: range.start ?? a.entries.map((e) => e.date).reduce((x, y) => x.isBefore(y) ? x : y),
-                        end: range.end ?? a.entries.map((e) => e.date).reduce((x, y) => x.isAfter(y) ? x : y),
-                        currency: home,
-                      ),
+                      child: Builder(builder: (context) {
+                        // At least half a year, so a short range still shows a pattern.
+                        final end = range.end ?? a.entries.map((e) => e.date).reduce((x, y) => x.isAfter(y) ? x : y);
+                        final halfYear = end.subtract(const Duration(days: 26 * 7));
+                        final start = range.start == null || range.start!.isAfter(halfYear)
+                            ? (range.start == null
+                                ? a.entries.map((e) => e.date).reduce((x, y) => x.isBefore(y) ? x : y)
+                                : halfYear)
+                            : range.start!;
+                        final all = ref.watch(allEntriesProvider).value ?? a.entries;
+                        return ActivityHeatmap(
+                          days: Analytics(all, cats, home).daily(),
+                          start: start,
+                          end: end,
+                          currency: home,
+                        );
+                      }),
                     ),
                     _SavingsCard(summary: a.savings(), currency: home),
                     _Section(title: 'Where the money went', child: _ExpenseDrillDown(analytics: a)),
