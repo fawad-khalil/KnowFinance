@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:know_finance/data/app_database.dart';
 import 'package:know_finance/data/finance_repository.dart';
+import 'package:know_finance/data/sample_data.dart';
 import 'package:know_finance/models/entry.dart';
 import 'package:know_finance/models/entry_filter.dart';
 import 'package:know_finance/models/enums.dart';
@@ -146,5 +147,20 @@ void main() {
     await repo.deleteLoan(loan);
     expect(await repo.loanEntries(), isEmpty);
     expect(await repo.loans(), isEmpty);
+  });
+
+  test('sample data loads, and clearing removes it', () async {
+    await seedSampleData(repo, now: DateTime(2026, 10, 21));
+    final all = await repo.entries(const EntryFilter(preset: DatePreset.allTime));
+    expect(all.length, greaterThan(300));
+    expect(all.every((e) => !e.date.isAfter(DateTime(2026, 10, 21))), isTrue);
+    expect(await repo.investments(), hasLength(5));
+    expect(await repo.loans(), hasLength(3));
+    expect(await repo.pendingImportCount(), sampleAlerts.length);
+
+    await repo.clearAll();
+    expect(await repo.entries(const EntryFilter(preset: DatePreset.allTime)), isEmpty);
+    expect(await repo.investments(), isEmpty);
+    expect(await repo.categories(), isNotEmpty);
   });
 }

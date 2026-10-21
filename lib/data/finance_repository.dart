@@ -304,4 +304,12 @@ class FinanceRepository {
       }
     });
   }
+
+  /// Removes every entry, asset, loan and import, keeping types and cached
+  /// rates. Only offered in debug builds, before loading sample data.
+  Future<void> clearAll() => _db.transaction((txn) async {
+        for (final t in ['imports', 'entries', 'investments', 'loans']) {
+          await txn.delete(t);
+        }
+      });
 }

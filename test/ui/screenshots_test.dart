@@ -1,4 +1,4 @@
-// Renders the Insights and Reports screens with sample data to a PNG for eyeballing
+// Renders the main screens with the app's sample data to a PNG for eyeballing
 // layout. Skipped unless SCREENSHOT_DIR is set.
 import 'dart:io';
 
@@ -8,12 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:know_finance/data/app_database.dart';
 import 'package:know_finance/data/finance_repository.dart';
+import 'package:know_finance/data/sample_data.dart';
 import 'package:know_finance/main.dart';
-import 'package:know_finance/models/entry.dart';
 import 'package:know_finance/models/entry_filter.dart';
-import 'package:know_finance/models/enums.dart';
-import 'package:know_finance/models/investment.dart';
-import 'package:know_finance/models/loan.dart';
 import 'package:know_finance/state/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -50,80 +47,7 @@ void main() {
         SharedPreferences.setMockInitialValues({});
         prefs = await SharedPreferences.getInstance();
         final repo = FinanceRepository(db);
-        final cats = {for (final c in await repo.categories()) c.name: c.id!};
-        final fund = await repo.saveInvestment(Investment(
-            name: 'Meezan fund', type: AssetType.fund, currentValue: 395000, valueCurrency: 'PKR', valuedOn: DateTime(2026, 10, 1)));
-        final plot = await repo.saveInvestment(Investment(
-            name: 'DHA plot', type: AssetType.property, currentValue: 5600000, valueCurrency: 'PKR', valuedOn: DateTime(2026, 10, 1)));
-        final shares = await repo.saveInvestment(const Investment(name: 'PSO shares', type: AssetType.stocks, closed: true));
-        final gold = await repo.saveInvestment(Investment(
-            name: 'Gold', type: AssetType.gold, unit: QuantityUnit.tola, priceSymbol: 'XAU',
-            marketPrice: 437000, marketCurrency: 'PKR', marketPriceOn: DateTime(2026, 10, 19)));
-        final silver = await repo.saveInvestment(Investment(
-            name: 'Silver', type: AssetType.silver, unit: QuantityUnit.tola, priceSymbol: 'XAG',
-            marketPrice: 5600, marketCurrency: 'PKR', marketPriceOn: DateTime(2026, 10, 19)));
-        final land = await repo.saveInvestment(const Investment(name: 'Farm land', type: AssetType.property));
-        Future<void> add(String cat, double amt, DateTime d, String note, EntryKind k,
-                {int? inv, InvestmentFlow? flow, double? qty, int? loan}) async =>
-            repo.saveEntry(Entry(
-              kind: k, amount: amt, currency: 'PKR', homeCurrency: 'PKR', fxRate: 1,
-              categoryId: loan != null ? await repo.loanCategoryId(k) : cats[cat]!, date: d, note: note,
-              investmentId: inv, investmentFlow: flow, quantity: qty, loanId: loan));
-        // Loans: a car loan being paid off, money lent to a friend, one settled.
-        final car = await repo.saveLoan(Loan(name: 'Car loan (Meezan)', direction: LoanDirection.payable, dueDate: DateTime(2028, 6, 1)));
-        final ali = await repo.saveLoan(const Loan(name: 'Ali', direction: LoanDirection.receivable));
-        final sara = await repo.saveLoan(const Loan(name: 'Sara', direction: LoanDirection.receivable));
-        await add('', 1200000, DateTime(2025, 6, 1), 'Car loan', EntryKind.income, loan: car);
-        for (var m = 7; m <= 22; m++) {
-          await add('', 40000, DateTime(2025, m, 5), 'Car loan instalment', EntryKind.expense, loan: car);
-        }
-        await add('', 50000, DateTime(2026, 5, 10), 'Ali', EntryKind.expense, loan: ali);
-        await add('', 20000, DateTime(2026, 9, 12), 'Ali', EntryKind.income, loan: ali);
-        await add('', 15000, DateTime(2026, 2, 1), 'Sara', EntryKind.expense, loan: sara);
-        await add('', 15000, DateTime(2026, 3, 1), 'Sara', EntryKind.income, loan: sara);
-        await add('Investments', 5000000, DateTime(2025, 5, 3), 'DHA plot', EntryKind.expense, inv: plot, flow: InvestmentFlow.buy);
-        await add('Investments', 150000, DateTime(2025, 5, 4), 'DHA plot transfer fee', EntryKind.expense, inv: plot, flow: InvestmentFlow.cost);
-        await add('Investments', 300000, DateTime(2025, 6, 10), 'PSO shares', EntryKind.expense, inv: shares, flow: InvestmentFlow.buy);
-        await add('Profit & dividends', 12000, DateTime(2025, 9, 20), 'PSO dividend', EntryKind.income, inv: shares, flow: InvestmentFlow.income);
-        await add('Business', 340000, DateTime(2026, 3, 15), 'PSO shares sold', EntryKind.income, inv: shares, flow: InvestmentFlow.sale);
-        // Market prices on the gold buy days, so the detail page can compare
-        // without going online. Cached per troy ounce like the real feed.
-        await repo.cacheRate('2025-06-02', 'XAU', 'PKR', 280000 * 31.1034768 / 11.6638038);
-        await repo.cacheRate('2026-02-08', 'XAU', 'PKR', 372000 * 31.1034768 / 11.6638038);
-        // The last two months, so "this month" has something to compare.
-        final now = DateTime.now();
-        for (final (m, extra) in [(now.month - 1, 0.0), (now.month, 18000.0)]) {
-          final last = m == now.month ? now.day : 28;
-          await add('Salary', 260000, DateTime(now.year, m, 1), 'Xorlogics', EntryKind.income);
-          await add('Rent', 70000, DateTime(now.year, m, 2), 'House rent', EntryKind.expense);
-          await add('Groceries', 32000 + extra, DateTime(now.year, m, 6.clamp(1, last)), 'Imtiaz', EntryKind.expense);
-          await add('Dining out', 9000 + extra, DateTime(now.year, m, 9.clamp(1, last)), 'KFC', EntryKind.expense);
-          await add('Utilities', 21000, DateTime(now.year, m, 10.clamp(1, last)), 'K-Electric', EntryKind.expense);
-          await add('Shopping', 15000 + extra, DateTime(now.year, m, 14.clamp(1, last)), 'Daraz', EntryKind.expense);
-        }
-        await add('Investments', 290000, DateTime(2025, 6, 2), 'Gold 1 tola', EntryKind.expense, inv: gold, flow: InvestmentFlow.buy, qty: 1);
-        await add('Investments', 195000, DateTime(2026, 2, 8), 'Gold 0.5 tola', EntryKind.expense, inv: gold, flow: InvestmentFlow.buy, qty: 0.5);
-        await add('Investments', 42000, DateTime(2025, 8, 9), 'Silver 10 tola', EntryKind.expense, inv: silver, flow: InvestmentFlow.buy, qty: 10);
-        await add('Investments', 900000, DateTime(2025, 11, 1), 'Farm land', EntryKind.expense, inv: land, flow: InvestmentFlow.buy);
-        for (var i = 0; i < 18; i++) {
-          final m = i < 12 ? i + 1 : i - 11;
-          final y = i < 12 ? 2025 : 2026;
-          if (y == 2025 && m < 5) continue;
-          await add('Salary', 250000, DateTime(y, m, 1), 'Xorlogics', EntryKind.income);
-          if (m.isEven) await add('Freelance', 60000.0 + m * 1000, DateTime(y, m, 15), 'Upwork', EntryKind.income);
-          await add('Rent', 70000, DateTime(y, m, 2), 'House rent', EntryKind.expense);
-          await add('Groceries', 25000.0 + m * 900, DateTime(y, m, 6), 'Imtiaz', EntryKind.expense);
-          await add('Groceries', 9000, DateTime(y, m, 18), 'imtiaz', EntryKind.expense);
-          await add('Utilities', 18000.0 - m * 500, DateTime(y, m, 10), 'K-Electric', EntryKind.expense);
-          await add('Fuel & transport', 15000, DateTime(y, m, 12), 'Careem', EntryKind.expense);
-          await add('Dining out', 8000.0 + m * 1500, DateTime(y, m, 20), 'KFC', EntryKind.expense);
-          await add('Shopping', 12000, DateTime(y, m, 22), 'Daraz', EntryKind.expense);
-          await add('Committee (BC)', 30000, DateTime(y, m, 5), 'BC', EntryKind.expense);
-          await add('Investments', 20000, DateTime(y, m, 25), 'Meezan fund', EntryKind.expense, inv: fund, flow: InvestmentFlow.buy);
-          if (y == 2026 || m > 6) await add('Rental', 45000, DateTime(y, m, 7), 'DHA plot rent', EntryKind.income, inv: plot, flow: InvestmentFlow.income);
-          if (m % 3 == 0) await add('Dining out', 4500, DateTime(y, m, 21), 'Kolachi', EntryKind.expense);
-          if (m.isOdd) await add('Health', 6000, DateTime(y, m, 14), 'Pharmacy', EntryKind.expense);
-        }
+        await seedSampleData(repo);
       });
       final scope = ProviderScope(
         overrides: [
