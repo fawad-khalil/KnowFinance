@@ -54,7 +54,7 @@ class InsightsScreen extends ConsumerWidget {
                     const ThisMonthCard(),
                     const SavingsHistoryCard(),
                     const SizedBox(height: 12),
-                    Text('Selected period', style: Theme.of(context).textTheme.titleSmall),
+                    Text('Selected period, against the one before', style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 4),
                     _KpiGrid(
                       current: a.savings(),
@@ -319,15 +319,13 @@ class _Kpi extends StatelessWidget {
                 ? Text('No earlier period', style: muted)
                 : Row(children: [
                     Flexible(
-                      flex: 2,
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: TrendChip(value: ch.$1, suffix: ch.$2 ? ' pts' : '%', upIsGood: upIsGood),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(child: Text('vs previous', style: muted, overflow: TextOverflow.ellipsis)),
+
                   ]),
           ],
         ),
