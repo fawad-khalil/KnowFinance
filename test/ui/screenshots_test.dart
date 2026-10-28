@@ -33,7 +33,7 @@ void main() {
   sqfliteFfiInit();
 
   for (final (tab, dark) in [
-    for (final t in ['Insights', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
+    for (final t in ['Insights', 'Last 30 days', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
   ]) {
     testWidgets('$tab screenshot ${dark ? 'dark' : 'light'}', skip: _dir == null, (tester) async {
       tester.view.physicalSize = const Size(1080, 7600);
@@ -67,8 +67,12 @@ void main() {
       }
 
       // "Gold" is the gold asset's own page, opened from the Assets list.
-      await tester.tap(find.text(tab == 'Gold' || tab == 'Loans' ? 'Assets' : tab).last);
+      await tester.tap(find.text(switch (tab) { 'Gold' || 'Loans' => 'Assets', 'Last 30 days' => 'Insights', _ => tab }).last);
       await settle();
+      if (tab == 'Last 30 days') {
+        await tester.tap(find.text('View insights'));
+        await settle();
+      }
       if (tab == 'Loans') {
         await tester.tap(find.text('Loans').last);
         await settle();
@@ -77,7 +81,7 @@ void main() {
         await tester.tap(find.widgetWithText(ListTile, 'Gold'));
         await settle();
       }
-      await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_dir/${tab.toLowerCase()}_${dark ? 'dark' : 'light'}.png'));
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('$_dir/${tab.toLowerCase().replaceAll(' ', '_')}_${dark ? 'dark' : 'light'}.png'));
       await tester.runAsync(db.close);
     });
   }

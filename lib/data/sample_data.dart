@@ -25,6 +25,8 @@ Future<void> seedSampleData(FinanceRepository repo, {DateTime? now, bool withImp
   final n = now ?? DateTime.now();
   final today = DateTime(n.year, n.month, n.day);
   final rnd = Random(42);
+  // Its own generator, so the bank details don't shift the amounts above.
+  final when = Random(7);
   final cats = {for (final c in await repo.categories()) c.name: c.id!};
 
   DateTime monthsAgo(int m, int day) {
@@ -36,9 +38,37 @@ Future<void> seedSampleData(FinanceRepository repo, {DateTime? now, bool withImp
 
   double vary(double base, double spread) => (base * (1 + (rnd.nextDouble() * 2 - 1) * spread)).roundToDouble();
 
+  /// How each regular payee is paid: bank, channel, who the alert names,
+  /// their bank and the hour it usually happens.
+  const paidBy = <String, (String, PayChannel, String, String?, int)>{
+    'Xorlogics': ('Meezan', PayChannel.transfer, 'XORLOGICS PVT LTD', 'Standard Chartered', 10),
+    'Upwork': ('Meezan', PayChannel.transfer, 'PAYONEER', null, 15),
+    'Brother (UAE)': ('Meezan', PayChannel.raast, 'Usman Khalil', 'UBL', 20),
+    'DHA plot rent': ('Meezan', PayChannel.raast, 'Kamran Ahmed', 'Bank Alfalah', 12),
+    'House rent': ('HBL', PayChannel.raast, 'Tariq Mehmood', 'MCB', 11),
+    'K-Electric': ('HBL', PayChannel.transfer, 'K-ELECTRIC', null, 13),
+    'SSGC gas': ('HBL', PayChannel.transfer, 'SSGC', null, 13),
+    'PTCL Flash fiber': ('HBL', PayChannel.transfer, 'PTCL', null, 9),
+    'School fee': ('HBL', PayChannel.transfer, 'BEACONHOUSE', null, 10),
+    'Imtiaz': ('HBL', PayChannel.card, 'IMTIAZ SUPER MARKET', null, 19),
+    'imtiaz': ('HBL', PayChannel.card, 'IMTIAZ SUPER MARKET', null, 20),
+    'Netflix': ('HBL', PayChannel.card, 'NETFLIX.COM', null, 2),
+    'Daraz': ('HBL', PayChannel.card, 'DARAZ', null, 22),
+    'Pharmacy': ('HBL', PayChannel.card, 'SERVAID PHARMACY', null, 18),
+    'Meezan savings': ('HBL', PayChannel.transfer, '', 'Meezan', 10),
+    'BC': ('HBL', PayChannel.raast, 'Asma Bano', 'Easypaisa', 21),
+    'KFC': ('HBL', PayChannel.card, 'KFC', null, 21),
+    'Careem': ('HBL', PayChannel.card, 'CAREEM', null, 9),
+    'PSO petrol': ('HBL', PayChannel.cash, '', null, 17),
+    'Kolachi': ('HBL', PayChannel.card, 'KOLACHI', null, 22),
+    'Ali': ('HBL', PayChannel.raast, 'Ali Raza', 'Meezan', 20),
+    'Car loan instalment': ('Meezan', PayChannel.transfer, 'MEEZAN AUTO', 'Meezan', 9),
+  };
+
   Future<void> add(String cat, double amt, DateTime d, String note, EntryKind k,
-      {int? inv, InvestmentFlow? flow, double? qty, int? loan}) async {
+      {int? inv, InvestmentFlow? flow, double? qty, int? loan, (String, PayChannel, String, String?, int)? via}) async {
     if (d.isAfter(today)) return;
+    final how = via ?? paidBy[note];
     await repo.saveEntry(Entry(
       kind: k,
       amount: amt,
@@ -52,6 +82,11 @@ Future<void> seedSampleData(FinanceRepository repo, {DateTime? now, bool withImp
       investmentFlow: flow,
       quantity: qty,
       loanId: loan,
+      bank: how?.$1,
+      channel: how?.$2,
+      counterparty: how?.$3 ?? '',
+      counterpartyBank: how?.$4,
+      minuteOfDay: how == null ? null : (how.$5 + when.nextInt(3) - 1).clamp(0, 23) * 60 + when.nextInt(60),
     ));
   }
 
@@ -89,6 +124,30 @@ Future<void> seedSampleData(FinanceRepository repo, {DateTime? now, bool withImp
       await add(cat, vary(base, 0.3), day, note, EntryKind.expense);
     }
   }
+  // Splitting bills with friends over Raast, mostly in the evenings and at
+  // weekends, with some paying their share back.
+  const friends = [('Ali Raza', 'Meezan'), ('Sara Iqbal', 'HBL'), ('Bilal Shah', 'SadaPay'), ('Hina Malik', 'UBL')];
+  for (var day = 0; day < 120; day++) {
+    final d = today.subtract(Duration(days: day));
+    final weekend = d.weekday >= DateTime.friday;
+    if (when.nextInt(weekend ? 3 : 7) != 0) continue;
+    // A new friend joins the circle in the last month.
+    final pool = day < 20 ? friends.length : friends.length - 1;
+    final (name, bank) = friends[when.nextInt(pool)];
+    final hour = 18 + when.nextInt(5);
+    final amount = (500 + when.nextInt(50) * 100).toDouble();
+    if (when.nextInt(3) == 0) {
+      await add('Other income', amount, d, name.split(' ').first, EntryKind.income,
+          via: ('HBL', PayChannel.raast, name, bank, hour));
+    } else {
+      await add('Dining out', amount * 1.5, d, name.split(' ').first, EntryKind.expense,
+          via: ('HBL', PayChannel.raast, name, bank, hour));
+    }
+  }
+
+  await add('Dining out', 4200, today.subtract(const Duration(days: 4)), 'Hina', EntryKind.expense,
+      via: ('HBL', PayChannel.raast, 'Hina Malik', 'UBL', 20));
+
   // An expensive month two months back, so the savings history has a dip.
   await add('Travel', 260000, monthsAgo(2, 24), 'Hunza trip', EntryKind.expense);
 
