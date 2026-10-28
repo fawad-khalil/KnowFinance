@@ -33,7 +33,7 @@ void main() {
   sqfliteFfiInit();
 
   for (final (tab, dark) in [
-    for (final t in ['Insights', 'View insights', 'Snapshot', 'Raast', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
+    for (final t in ['Insights', 'Money flow', 'Raast', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
   ]) {
     testWidgets('$tab screenshot ${dark ? 'dark' : 'light'}', skip: _dir == null, (tester) async {
       tester.view.physicalSize = const Size(1080, 7600);
@@ -67,14 +67,14 @@ void main() {
       }
 
       // "Gold" is the gold asset's own page, opened from the Assets list.
-      await tester.tap(find.text(switch (tab) { 'Gold' || 'Loans' => 'Assets', 'View insights' || 'Snapshot' || 'Raast' => 'Insights', _ => tab }).last);
+      await tester.tap(find.text(switch (tab) { 'Gold' || 'Loans' => 'Assets', 'Money flow' || 'Raast' => 'Insights', _ => tab }).last);
       await settle();
-      if (tab == 'View insights' || tab == 'Snapshot' || tab == 'Raast') {
-        await tester.tap(find.text('View insights'));
+      if (tab == 'Money flow' || tab == 'Raast') {
+        await tester.tap(find.text('Money patterns'));
         await settle();
       }
-      if (tab == 'Snapshot' || tab == 'Raast') {
-        await tester.tap(find.text(tab == 'Snapshot' ? 'Last 30 days snapshot' : 'Raast insights'));
+      if (tab == 'Raast') {
+        await tester.tap(find.text('Raast').last);
         await settle();
       }
       if (tab == 'Loans') {

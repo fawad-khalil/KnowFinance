@@ -7,171 +7,76 @@ import '../../services/money_insights.dart';
 import '../../state/providers.dart';
 import '../chart_colors.dart';
 
-/// "View insights": the last 30 days snapshot and Raast insights, each on
-/// its own page.
-class MoneyInsightsScreen extends StatelessWidget {
+/// Money patterns over the last 30 days, in two tabs: how money flows in
+/// and out, and how the user uses Raast.
+class MoneyInsightsScreen extends ConsumerWidget {
   const MoneyInsightsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    void open(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
-    return Scaffold(
-      appBar: AppBar(title: const Text('View insights')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-        children: [
-          Text('Track and understand your account activity.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Expanded(
-                child: _HubTile(
-                  icon: Icons.person_search_outlined,
-                  title: 'Last 30 days snapshot',
-                  subtitle: 'Who pays you, where it goes, your banks and money style',
-                  color: theme.colorScheme.primaryContainer,
-                  onColor: theme.colorScheme.onPrimaryContainer,
-                  onTap: () => open(const SnapshotScreen()),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _HubTile(
-                  icon: Icons.qr_code_scanner,
-                  title: 'Raast insights',
-                  subtitle: 'Your Raast transfers, inner circle and busiest times',
-                  color: theme.colorScheme.tertiaryContainer,
-                  onColor: theme.colorScheme.onTertiaryContainer,
-                  onTap: () => open(const RaastInsightsScreen()),
-                ),
-              ),
-            ]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HubTile extends StatelessWidget {
-  const _HubTile(
-      {required this.icon, required this.title, required this.subtitle, required this.color, required this.onColor, required this.onTap});
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final Color onColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      color: color,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Icon(icon, size: 36, color: onColor),
-              const Spacer(),
-              Icon(Icons.chevron_right, color: onColor),
-            ]),
-            const SizedBox(height: 48),
-            Text(title, style: theme.textTheme.titleMedium?.copyWith(color: onColor)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: onColor)),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-/// Loads the insights and lays out one page of cards under the date range.
-class _InsightsPage extends ConsumerWidget {
-  const _InsightsPage({required this.title, required this.cards});
-
-  final String title;
-  final List<Widget> Function(MoneyInsights m) cards;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final insights = ref.watch(moneyInsightsProvider);
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: insights.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Could not load: $e')),
-        data: (m) => m.window.isEmpty
-            ? const Center(child: Text('Nothing logged in the last 30 days yet.'))
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-                children: [
-                  Text(
-                    'Last 30 days: ${DateFormat('d MMM').format(m.start)} to ${DateFormat('d MMM yyyy').format(m.end)}',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                  ...cards(m),
-                ],
-              ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Money patterns'),
+          bottom: const TabBar(tabs: [
+            Tab(icon: Icon(Icons.swap_vert), text: 'Money flow'),
+            Tab(icon: Icon(Icons.bolt), text: 'Raast'),
+          ]),
+        ),
+        body: insights.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Could not load: $e')),
+          data: (m) => m.window.isEmpty
+              ? const Center(child: Text('Nothing logged in the last 30 days yet.'))
+              : TabBarView(children: [_page(context, m, _flowCards(m)), _page(context, m, _raastCards(m))]),
+        ),
       ),
     );
   }
-}
 
-/// Who pays the user, where the money goes, how long it stays, which banks
-/// matter and whether they pay digitally or in cash.
-class SnapshotScreen extends StatelessWidget {
-  const SnapshotScreen({super.key});
+  static Widget _page(BuildContext context, MoneyInsights m, List<Widget> cards) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+      children: [
+        Text(
+          '${DateFormat('d MMM').format(m.start)} – ${DateFormat('d MMM yyyy').format(m.end)}',
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        ...cards,
+      ],
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) => _InsightsPage(
-        title: 'Last 30 days snapshot',
-        cards: (m) => [
-          _Card(title: 'Who sends you money', icon: Icons.south_west, child: _Senders(m)),
-          _Card(title: 'Where your money goes', icon: Icons.north_east, child: _TopSpending(m)),
-          _Card(title: 'How long money stays', icon: Icons.hourglass_bottom, child: _Holding(m)),
-          _Card(title: 'Bank dependency', icon: Icons.account_balance, child: _BankDependency(m)),
-          _Card(title: 'Your real financial home', icon: Icons.home_outlined, child: _FinancialHome(m)),
-          _Card(title: 'Money style', icon: Icons.contactless_outlined, child: _MoneyStyle(m)),
-        ],
-      );
-}
+  static List<Widget> _flowCards(MoneyInsights m) => [
+        _Card(title: 'Money in, by sender', icon: Icons.call_received, child: _Senders(m)),
+        _Card(title: 'Biggest spend', icon: Icons.shopping_bag_outlined, child: _TopSpending(m)),
+        _Card(title: 'Spending pace', icon: Icons.speed, child: _Holding(m)),
+        _Card(title: 'Income by bank', icon: Icons.account_balance, child: _BankDependency(m)),
+        _Card(title: 'Most-used bank', icon: Icons.star_outline, child: _FinancialHome(m)),
+        _Card(title: 'Digital or cash', icon: Icons.payments_outlined, child: _MoneyStyle(m)),
+      ];
 
-/// Raast sent and received, the people in it, their banks and busy times.
-class RaastInsightsScreen extends StatelessWidget {
-  const RaastInsightsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => _InsightsPage(
-        title: 'Raast insights',
-        cards: (m) {
-          final raast = m.raast();
-          if (raast.count == 0) {
-            return const [
-              _Card(
-                title: 'No Raast transfers',
-                icon: Icons.bolt,
-                child: Text('Raast transfers read from your bank alerts in the last 30 days show up here.'),
-              ),
-            ];
-          }
-          return [
-            _Card(title: '30-day Raast summary', icon: Icons.bolt, child: _RaastSummary(raast, m.home)),
-            _Card(title: 'Inner circle', icon: Icons.people_outline, child: _InnerCircle(raast, m.home)),
-            _Card(title: 'Behind your circle', icon: Icons.account_balance_outlined, child: _CircleBanks(raast, m.home)),
-            _Card(title: 'When your network comes alive', icon: Icons.schedule, child: _BusyTimes(raast)),
-          ];
-        },
-      );
+  static List<Widget> _raastCards(MoneyInsights m) {
+    final raast = m.raast();
+    if (raast.count == 0) {
+      return const [
+        _Card(
+          title: 'No Raast transfers',
+          icon: Icons.bolt,
+          child: Text('Raast transfers read from your bank alerts in the last 30 days show up here.'),
+        ),
+      ];
+    }
+    return [
+      _Card(title: 'Raast at a glance', icon: Icons.bolt, child: _RaastSummary(raast, m.home)),
+      _Card(title: 'Your regulars', icon: Icons.people_outline, child: _InnerCircle(raast, m.home)),
+      _Card(title: 'Where they bank', icon: Icons.account_balance_outlined, child: _CircleBanks(raast, m.home)),
+      _Card(title: 'Busy times', icon: Icons.schedule, child: _BusyTimes(raast)),
+    ];
+  }
 }
 
 class _Card extends StatelessWidget {

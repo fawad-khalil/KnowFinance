@@ -132,7 +132,7 @@ class InsightsScreen extends ConsumerWidget {
   }
 }
 
-/// Opens the last-30-days snapshot: senders, banks, money style and Raast.
+/// Opens money patterns: senders, banks, spending pace and Raast.
 class _MoneyInsightsLink extends StatelessWidget {
   const _MoneyInsightsLink();
 
@@ -152,14 +152,12 @@ class _MoneyInsightsLink extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Your last 30 days',
+                Text('Money patterns',
                     style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSecondaryContainer)),
-                Text('Who pays you, how long money stays, your banks and Raast',
+                Text('Last 30 days of senders, banks, spending pace and Raast',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSecondaryContainer)),
               ]),
             ),
-            Text('View insights',
-                style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSecondaryContainer)),
             Icon(Icons.chevron_right, color: theme.colorScheme.onSecondaryContainer),
           ]),
         ),
