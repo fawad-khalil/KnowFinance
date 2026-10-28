@@ -16,6 +16,7 @@ import '../models/enums.dart';
 import '../models/investment.dart';
 import '../models/loan.dart';
 import '../services/fx_service.dart';
+import '../services/money_insights.dart';
 import '../services/price_service.dart';
 
 /// Overridden in main() once the database is open.
@@ -169,6 +170,15 @@ final importFlagsProvider = FutureProvider<Map<int, List<ImportFlag>>>((ref) asy
 final allEntriesProvider = FutureProvider<List<Entry>>((ref) async {
   ref.watch(dataVersionProvider);
   return withoutLoans(await ref.watch(repositoryProvider).entries(const EntryFilter(preset: DatePreset.allTime)));
+});
+
+/// The last 30 days ending today, worked out over every entry (loans
+/// too) so holding time and new Raast contacts can look further back.
+final moneyInsightsProvider = FutureProvider<MoneyInsights>((ref) async {
+  ref.watch(dataVersionProvider);
+  final cats = await ref.watch(categoriesProvider.future);
+  final all = await ref.watch(repositoryProvider).entries(const EntryFilter(preset: DatePreset.allTime));
+  return MoneyInsights(all, {for (final c in cats) c.id!: c}, ref.watch(homeCurrencyProvider), end: DateTime.now());
 });
 
 final loansProvider = FutureProvider<List<Loan>>((ref) {

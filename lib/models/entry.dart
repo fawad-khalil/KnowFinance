@@ -21,6 +21,11 @@ class Entry {
     this.investmentFlow,
     this.quantity,
     this.loanId,
+    this.bank,
+    this.counterparty = '',
+    this.counterpartyBank,
+    this.channel,
+    this.minuteOfDay,
   });
 
   final int? id;
@@ -47,6 +52,21 @@ class Entry {
   /// move money but are neither income nor spending.
   final int? loanId;
 
+  /// The user's bank or wallet the money went through, named as the alert
+  /// parser names banks ("HBL", "Meezan").
+  final String? bank;
+
+  /// Who paid or got paid, as the alert named them. Unlike [note] it isn't
+  /// edited, so it still matches the same person across entries.
+  final String counterparty;
+
+  /// The other side's bank, when the alert shows it.
+  final String? counterpartyBank;
+  final PayChannel? channel;
+
+  /// Time of day in minutes after midnight, when known.
+  final int? minuteOfDay;
+
   bool get isLoan => loanId != null;
 
   bool get needsRate => fxRate == null;
@@ -67,6 +87,8 @@ class Entry {
     InvestmentFlow? Function()? investmentFlow,
     double? Function()? quantity,
     int? Function()? loanId,
+    String? Function()? bank,
+    PayChannel? Function()? channel,
   }) =>
       Entry(
         id: id,
@@ -83,6 +105,11 @@ class Entry {
         investmentFlow: investmentFlow != null ? investmentFlow() : this.investmentFlow,
         quantity: quantity != null ? quantity() : this.quantity,
         loanId: loanId != null ? loanId() : this.loanId,
+        bank: bank != null ? bank() : this.bank,
+        counterparty: counterparty,
+        counterpartyBank: counterpartyBank,
+        channel: channel != null ? channel() : this.channel,
+        minuteOfDay: minuteOfDay,
       );
 
   Map<String, Object?> toMap() => {
@@ -100,6 +127,11 @@ class Entry {
         'investment_flow': investmentFlow?.name,
         'quantity': quantity,
         'loan_id': loanId,
+        'bank': bank,
+        'counterparty': counterparty,
+        'counterparty_bank': counterpartyBank,
+        'channel': channel?.name,
+        'minute_of_day': minuteOfDay,
       };
 
   factory Entry.fromMap(Map<String, Object?> m) => Entry(
@@ -117,6 +149,11 @@ class Entry {
         investmentFlow: InvestmentFlow.fromName(m['investment_flow'] as String?),
         quantity: (m['quantity'] as num?)?.toDouble(),
         loanId: m['loan_id'] as int?,
+        bank: m['bank'] as String?,
+        counterparty: (m['counterparty'] as String?) ?? '',
+        counterpartyBank: m['counterparty_bank'] as String?,
+        channel: PayChannel.fromName(m['channel'] as String?),
+        minuteOfDay: m['minute_of_day'] as int?,
       );
 }
 

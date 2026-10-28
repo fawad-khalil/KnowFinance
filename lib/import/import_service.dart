@@ -126,6 +126,11 @@ class ImportService {
         note: note,
         source: p.source,
         loanId: loanId,
+        bank: p.bank,
+        counterparty: p.counterparty,
+        counterpartyBank: p.counterpartyBank,
+        channel: p.channel,
+        minuteOfDay: p.minuteOfDay,
       ),
     );
   }
