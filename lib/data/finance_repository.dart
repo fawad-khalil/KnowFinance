@@ -357,6 +357,13 @@ class FinanceRepository {
         return id;
       });
 
+  /// Records [entryId], logged some other way, as the payment due on [due].
+  Future<void> linkRecurringPost(int recurringId, DateTime due, int entryId) => _db.insert(
+        'recurring_posts',
+        {'recurring_id': recurringId, 'due': dateKey(due), 'entry_id': entryId},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
   Future<void> skipRecurring(int recurringId, DateTime due) => _db.insert(
         'recurring_posts',
         {'recurring_id': recurringId, 'due': dateKey(due), 'status': 'skipped'},

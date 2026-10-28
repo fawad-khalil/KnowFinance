@@ -33,7 +33,7 @@ void main() {
   sqfliteFfiInit();
 
   for (final (tab, dark) in [
-    for (final t in ['Insights', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
+    for (final t in ['Insights', 'Budget', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
   ]) {
     testWidgets('$tab screenshot ${dark ? 'dark' : 'light'}', skip: _dir == null, (tester) async {
       tester.view.physicalSize = const Size(1080, 7600);
