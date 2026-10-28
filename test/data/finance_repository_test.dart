@@ -119,8 +119,15 @@ void main() {
       onCreate: (db, _) async {
         await db.execute('CREATE TABLE categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, kind TEXT NOT NULL, bucket TEXT, archived INTEGER NOT NULL DEFAULT 0)');
         await db.execute("CREATE TABLE entries (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, amount REAL NOT NULL, currency TEXT NOT NULL, home_currency TEXT NOT NULL, fx_rate REAL, category_id INTEGER NOT NULL REFERENCES categories(id), date TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT 'manual')");
+        await db.execute("CREATE TABLE imports (id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT NOT NULL UNIQUE, source TEXT NOT NULL, kind TEXT NOT NULL, amount REAL NOT NULL, currency TEXT NOT NULL, date TEXT NOT NULL, counterparty TEXT NOT NULL DEFAULT '', bank TEXT, raw TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', entry_id INTEGER REFERENCES entries(id) ON DELETE SET NULL)");
         await db.insert('categories', {'name': 'Investments', 'kind': 'expense', 'bucket': 'savings'});
         await db.insert('entries', {'kind': 'expense', 'amount': 10, 'currency': 'PKR', 'home_currency': 'PKR', 'fx_rate': 1, 'category_id': 1, 'date': '2026-01-01'});
+        await db.insert('entries', {'kind': 'income', 'amount': 25000, 'currency': 'PKR', 'home_currency': 'PKR', 'fx_rate': 1, 'category_id': 1, 'date': '2026-10-19', 'note': 'Rent share', 'source': 'sms'});
+        await db.insert('imports', {
+          'fingerprint': 'f1', 'source': 'sms', 'kind': 'income', 'amount': 25000, 'currency': 'PKR', 'date': '2026-10-19',
+          'counterparty': 'ABC', 'status': 'accepted', 'entry_id': 2,
+          'raw': 'PKR 25,000.00 received from ABC AC#xxxPYMT PK94SCBL888777 as RAAST payment to your AC# 986987 on 19-Oct-2026 at 18:11',
+        });
       },
     ));
     await v2.close();
@@ -128,8 +135,15 @@ void main() {
     appDb = await AppDatabase.open(factory: databaseFactoryFfi, path: path);
     repo = FinanceRepository(appDb);
     final all = await repo.entries(const EntryFilter(preset: DatePreset.allTime));
-    expect(all.single.investmentId, isNull);
+    expect(all.last.investmentId, isNull);
     expect(await repo.investments(), isEmpty);
+    // Entries made from alerts pick up the details read from them again.
+    final raast = all.first;
+    expect(raast.channel, PayChannel.raast);
+    expect(raast.counterparty, 'ABC');
+    expect(raast.counterpartyBank, 'Standard Chartered');
+    expect(raast.minuteOfDay, 18 * 60 + 11);
+    expect(raast.note, 'Rent share', reason: 'the note stays as the user wrote it');
   });
 
   test('loan entries move to the hidden Loan type and back out of the loan', () async {

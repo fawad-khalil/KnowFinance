@@ -146,4 +146,60 @@ void main() {
       expect(x.date, DateTime(2026, 10, 10));
     });
   });
+
+  group('channel, other bank and time', () {
+    final received = DateTime(2026, 10, 20, 9, 5);
+
+    test('RAAST received names the sender bank from the IBAN', () {
+      final t = parser.parse(
+          'PKR 25,000.00 received from ABC AC#xxxPYMT PK94SCBL888777 as RAAST payment to your AC# 986987 '
+          'of XYZ BR LHR on 19-Oct-2026 at 18:11',
+          receivedAt: received)!;
+      expect(t.channel, PayChannel.raast);
+      expect(t.counterpartyBank, 'Standard Chartered');
+      expect(t.bank, isNull, reason: "the sender's IBAN isn't the user's bank");
+      expect(t.minuteOfDay, 18 * 60 + 11);
+    });
+
+    test('bank named next to the payee is theirs, not the user\'s', () {
+      final t = parser.parse(
+          'PKR 4,23,434.00 sent to ABC (MBL AC from your A/C xxx6373 on 18-Oct-2026 at 19:22 TID:87987987',
+          receivedAt: received)!;
+      expect(t.counterpartyBank, 'Meezan');
+      expect(t.bank, isNull);
+      expect(t.channel, PayChannel.transfer);
+      expect(t.minuteOfDay, 19 * 60 + 22);
+    });
+
+    test('RAAST sent to a bank account', () {
+      final t = parser.parse(
+          'Dear Customer, PKR 100,000.00 sent SCB PK A/C ******4801 from FUNDS TRANSFER on 10-Oct-26 11:36 '
+          'via RAAST for TX ID MBMB1214123131231',
+          sender: 'MCB',
+          receivedAt: received)!;
+      expect(t.channel, PayChannel.raast);
+      expect(t.counterpartyBank, 'Standard Chartered');
+      expect(t.bank, 'MCB');
+      expect(t.minuteOfDay, 11 * 60 + 36);
+    });
+
+    test('card, ATM and wallet', () {
+      PayChannel? c(String text, {String? sender}) => parser.parse(text, sender: sender, receivedAt: received)!.channel;
+      expect(c('Dear Client, PKR 3,645.00 have been paid at MAJNOON on 17-10-26 using Debit Card no. 326XXXXXXX3479.'),
+          PayChannel.card);
+      expect(c('PKR 20,000 withdrawn from ATM at DHA Phase 5 on 18-Oct-26', sender: 'HBL'), PayChannel.atm);
+      expect(c('Rs 1500 sent to Ali Khan 0300xxxx123 via JazzCash. TID: 123456789.', sender: '8558'), PayChannel.wallet);
+    });
+
+    test('12-hour times', () {
+      final t = parser.parse('PKR 800 spent at CAREEM on 17/10/2026 at 7:05 PM', receivedAt: received)!;
+      expect(t.minuteOfDay, 19 * 60 + 5);
+    });
+
+    test('time from when the SMS arrived only when asked', () {
+      const text = 'PKR 800 spent at CAREEM on 17/10/2026';
+      expect(parser.parse(text, receivedAt: received)!.minuteOfDay, isNull);
+      expect(parser.parse(text, receivedAt: received, useReceivedTime: true)!.minuteOfDay, 9 * 60 + 5);
+    });
+  });
 }

@@ -129,3 +129,23 @@ enum QuantityUnit {
     return null;
   }
 }
+
+/// How money moved. Read from bank alerts or picked by hand.
+enum PayChannel {
+  raast('Raast'),
+  transfer('Bank transfer'),
+  card('Card'),
+  wallet('Wallet'),
+  atm('ATM'),
+  cash('Cash');
+
+  const PayChannel(this.label);
+  final String label;
+
+  /// Cash in hand rather than money moved between accounts.
+  bool get isCash => this == atm || this == cash;
+
+  static PayChannel? fromName(String? name) => name == null
+      ? null
+      : PayChannel.values.where((c) => c.name == name).firstOrNull;
+}
