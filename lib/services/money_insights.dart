@@ -89,15 +89,17 @@ class RaastSummary {
   List<Contact> get innerCircle =>
       ([...contacts]..sort((a, b) => a.twoWay != b.twoWay ? (a.twoWay ? -1 : 1) : b.count.compareTo(a.count))).take(5).toList();
 
-  /// How many people in the circle bank with each bank, most first.
+  /// Raast money sent and received through each bank or wallet the
+  /// circle uses, most first; [Portion.count] is how many people use it.
   List<Portion> get circleBanks {
-    final counts = <String, int>{};
+    final by = <String, (double, int)>{};
     for (final c in contacts) {
       final b = c.bank ?? 'Bank not shown';
-      counts[b] = (counts[b] ?? 0) + 1;
+      final (t, n) = by[b] ?? (0, 0);
+      by[b] = (t + c.total, n + 1);
     }
     return [
-      for (final e in counts.entries) Portion(e.key, e.value.toDouble(), contacts.length.toDouble(), count: e.value),
+      for (final MapEntry(:key, :value) in by.entries) Portion(key, value.$1, sent + received, count: value.$2),
     ]..sort((a, b) => b.total.compareTo(a.total));
   }
 }

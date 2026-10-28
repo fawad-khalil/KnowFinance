@@ -133,7 +133,7 @@ void main() {
     expect(r.newContacts, {'sara'});
     expect(r.repeatCount, 1);
     expect(r.innerCircle.first.name, 'Ali', reason: 'two-way contacts come first');
-    expect(r.circleBanks.map((b) => b.label), unorderedEquals(['HBL', 'Meezan']));
+    expect(r.circleBanks.map((b) => (b.label, b.total, b.count)), [('Meezan', 6000.0, 1), ('HBL', 3000.0, 1)]);
     // 5, 12 and 19 Oct 2026 are Mondays, 6 Oct a Tuesday.
     expect(r.byWeekday.take(2), [4, 1]);
     expect(r.byHour[21], 2);
