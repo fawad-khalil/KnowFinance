@@ -66,17 +66,19 @@ void main() {
     expect(t.first.pct, 75);
   });
 
-  test('money is spent first in, first out', () {
+  test('holding time is how long spending takes to catch up with income', () {
     final m = MoneyInsights([
-      e(1, 1000, DateTime(2026, 9, 1)),
-      e(2, 600, DateTime(2026, 9, 10)), // before the window: uses up 600 of it
+      e(1, 1000, DateTime(2026, 8, 1)), // too early to count
       e(1, 1000, DateTime(2026, 10, 1)),
-      e(2, 400, DateTime(2026, 10, 1)), // the last 400 of September's, held 30 days
-      e(2, 1000, DateTime(2026, 10, 11)), // October's, held 10 days
+      e(2, 400, DateTime(2026, 10, 3)),
+      e(2, 600, DateTime(2026, 10, 11)), // October's 1000 is spent after 10 days
+      e(1, 500, DateTime(2026, 10, 20)),
+      e(2, 500, DateTime(2026, 10, 22)), // this 500 after 2
+      e(1, 9000, DateTime(2026, 10, 25)), // not spent yet, so left out
     ], cats, 'PKR', end: end);
     final h = m.holdingTime()!;
-    expect(h.avgDays, closeTo((400 * 30 + 1000 * 10) / 1400, 0.001));
-    expect(h.withinWeekPct, 0);
+    expect(h.avgDays, closeTo((1000 * 10 + 500 * 2) / 1500, 0.001));
+    expect(h.withinWeekPct, closeTo(500 / 1500 * 100, 0.001));
   });
 
   test('no holding time without income to spend from', () {

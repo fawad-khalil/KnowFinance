@@ -174,34 +174,29 @@ class MoneyInsights {
     ]..sort((a, b) => b.total.compareTo(a.total));
   }
 
-  /// How many days money stayed before it was spent, on average, for
-  /// spending in the window. Money is spent first in, first out; spending
-  /// with no earlier income to draw on isn't counted. Null with nothing
-  /// to measure.
+  /// How many days it takes spending to catch up with money that comes in:
+  /// for each income from the 30 days before the window to its end, the
+  /// days until spending since it arrived adds up to its amount. Weighted
+  /// by amount; income not yet matched by spending isn't counted. Null with
+  /// nothing to measure.
   ({double avgDays, double withinWeekPct})? holdingTime() {
-    final lots = <(DateTime, double)>[];
-    var head = 0;
+    final flows = _all.where((e) => !e.isLoan).toList();
+    final from = DateTime(start.year, start.month, start.day - days);
     double weighted = 0, measured = 0, withinWeek = 0;
-    for (final e in _all) {
-      if (e.kind == EntryKind.income) {
-        lots.add((e.date, e.homeAmount!));
-        continue;
-      }
-      var need = e.homeAmount!;
-      while (need > 0 && head < lots.length) {
-        final (arrived, left) = lots[head];
-        final take = need < left ? need : left;
-        if (_inWindow(e) && !e.isLoan) {
-          final held = e.date.difference(arrived).inDays;
-          weighted += take * held;
-          measured += take;
-          if (held <= 7) withinWeek += take;
-        }
-        need -= take;
-        if (take >= left) {
-          head++;
-        } else {
-          lots[head] = (arrived, left - take);
+    for (var i = 0; i < flows.length; i++) {
+      final e = flows[i];
+      if (e.kind != EntryKind.income || e.date.isBefore(from) || e.date.isAfter(end)) continue;
+      var spent = 0.0;
+      for (final x in flows.skip(i + 1)) {
+        if (x.date.isAfter(end)) break;
+        if (x.kind != EntryKind.expense) continue;
+        spent += x.homeAmount!;
+        if (spent >= e.homeAmount!) {
+          final held = x.date.difference(e.date).inDays;
+          weighted += e.homeAmount! * held;
+          measured += e.homeAmount!;
+          if (held <= 7) withinWeek += e.homeAmount!;
+          break;
         }
       }
     }
