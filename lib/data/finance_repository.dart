@@ -2,12 +2,14 @@ import 'package:sqflite/sqflite.dart';
 
 import '../import/parsed_transaction.dart';
 import '../import/pending_import.dart';
+import '../models/budget.dart';
 import '../models/category.dart';
 import '../models/entry.dart';
 import '../models/entry_filter.dart';
 import '../models/enums.dart';
 import '../models/investment.dart';
 import '../models/loan.dart';
+import '../models/recurring_payment.dart';
 import '../services/analytics.dart';
 import 'app_database.dart';
 
@@ -305,10 +307,71 @@ class FinanceRepository {
     });
   }
 
-  /// Removes every entry, asset, loan and import, keeping types and cached
-  /// rates. Only offered in debug builds, before loading sample data.
+  // Budgets
+
+  Future<List<Budget>> budgets() async => (await _db.query('budgets')).map(Budget.fromMap).toList();
+
+  /// Sets the monthly budget for [categoryId], or the overall one when it is
+  /// null. A null or zero [amount] removes it.
+  Future<void> setBudget(int? categoryId, double? amount) => _db.transaction((txn) async {
+        await txn.delete('budgets',
+            where: categoryId == null ? 'category_id IS NULL' : 'category_id = ?',
+            whereArgs: [?categoryId]);
+        if (amount != null && amount > 0) {
+          await txn.insert('budgets', Budget(categoryId: categoryId, amount: amount).toMap()..remove('id'));
+        }
+      });
+
+  // Recurring payments
+
+  Future<List<RecurringPayment>> recurringPayments() async {
+    final rows = await _db.query('recurring', orderBy: 'paused, name COLLATE NOCASE');
+    return rows.map(RecurringPayment.fromMap).toList();
+  }
+
+  Future<int> saveRecurring(RecurringPayment r) async {
+    final map = r.toMap()..remove('id');
+    if (r.id == null) return _db.insert('recurring', map);
+    await _db.update('recurring', map, where: 'id = ?', whereArgs: [r.id]);
+    return r.id!;
+  }
+
+  /// Deletes the payment and its history; entries already logged stay.
+  Future<void> deleteRecurring(int id) => _db.delete('recurring', where: 'id = ?', whereArgs: [id]);
+
+  /// Paid and skipped due dates, optionally only those from [from] to [to].
+  Future<List<RecurringPost>> recurringPosts({DateTime? from, DateTime? to}) async {
+    final rows = await _db.query('recurring_posts',
+        where: from == null ? null : 'due >= ? AND due <= ?', whereArgs: from == null ? null : [dateKey(from), dateKey(to!)]);
+    return rows.map(RecurringPost.fromMap).toList();
+  }
+
+  /// Logs [entry] as the payment due on [due]. Returns the entry's id, or
+  /// null when that date was already handled.
+  Future<int?> postRecurring(int recurringId, DateTime due, Entry entry) => _db.transaction((txn) async {
+        final done = await txn.query('recurring_posts',
+            where: 'recurring_id = ? AND due = ?', whereArgs: [recurringId, dateKey(due)]);
+        if (done.isNotEmpty) return null;
+        final id = await txn.insert('entries', entry.toMap()..remove('id'));
+        await txn.insert('recurring_posts', {'recurring_id': recurringId, 'due': dateKey(due), 'entry_id': id});
+        return id;
+      });
+
+  Future<void> skipRecurring(int recurringId, DateTime due) => _db.insert(
+        'recurring_posts',
+        {'recurring_id': recurringId, 'due': dateKey(due), 'status': 'skipped'},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+
+  /// Forgets what happened on [due], so it shows as due again. The entry
+  /// logged for it, if any, stays.
+  Future<void> undoRecurringPost(int recurringId, DateTime due) =>
+      _db.delete('recurring_posts', where: 'recurring_id = ? AND due = ?', whereArgs: [recurringId, dateKey(due)]);
+
+  /// Removes every entry, asset, loan, import, budget and recurring payment,
+  /// keeping types and cached rates. Only offered in debug builds, before loading sample data.
   Future<void> clearAll() => _db.transaction((txn) async {
-        for (final t in ['imports', 'entries', 'investments', 'loans']) {
+        for (final t in ['recurring_posts', 'recurring', 'budgets', 'imports', 'entries', 'investments', 'loans']) {
           await txn.delete(t);
         }
       });

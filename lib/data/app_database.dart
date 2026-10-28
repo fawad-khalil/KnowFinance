@@ -9,7 +9,7 @@ class AppDatabase {
 
   final Database db;
 
-  static const _version = 5;
+  static const _version = 7;
 
   /// Opens the on-device database. [factory] and [path] let tests use an
   /// in-memory database through sqflite_common_ffi.
@@ -74,6 +74,7 @@ class AppDatabase {
     await batch.commit(noResult: true);
     // After the defaults, so their ids stay as they were.
     await _createLoans(db);
+    await _createBudgets(db);
   }
 
   static Future<void> _upgrade(Database db, int from, int to) async {
@@ -81,6 +82,43 @@ class AppDatabase {
     if (from < 3) await _createInvestments(db);
     if (from < 4) await _addQuantities(db);
     if (from < 5) await _createLoans(db);
+    // Version 6 is taken by the money insights branch.
+    if (from < 7) await _createBudgets(db);
+  }
+
+  /// Monthly budgets, and payments that repeat on a schedule. Each due date
+  /// that has been paid or skipped gets a row in recurring_posts, so it is
+  /// never posted twice, even when its entry is later deleted.
+  static Future<void> _createBudgets(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS budgets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category_id INTEGER UNIQUE REFERENCES categories(id) ON DELETE CASCADE,
+        amount REAL NOT NULL
+      )''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS recurring (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category_id INTEGER NOT NULL REFERENCES categories(id),
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL,
+        every INTEGER NOT NULL DEFAULT 1,
+        unit TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        auto_post INTEGER NOT NULL DEFAULT 1,
+        paused INTEGER NOT NULL DEFAULT 0,
+        created_on TEXT NOT NULL
+      )''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS recurring_posts (
+        recurring_id INTEGER NOT NULL REFERENCES recurring(id) ON DELETE CASCADE,
+        due TEXT NOT NULL,
+        entry_id INTEGER REFERENCES entries(id) ON DELETE SET NULL,
+        status TEXT NOT NULL DEFAULT 'paid',
+        PRIMARY KEY (recurring_id, due)
+      )''');
   }
 
   /// Payables and receivables. Loan entries use the app's own "Loan" types
