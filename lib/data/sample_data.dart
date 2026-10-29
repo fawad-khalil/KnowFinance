@@ -2,9 +2,11 @@ import 'dart:math';
 
 import '../import/alert_parser.dart';
 import '../models/entry.dart';
+import '../models/entry_filter.dart';
 import '../models/enums.dart';
 import '../models/investment.dart';
 import '../models/loan.dart';
+import '../models/recurring_payment.dart';
 import 'finance_repository.dart';
 
 /// Sample bank alerts for the import inbox (masked, as received).
@@ -197,7 +199,43 @@ Future<void> seedSampleData(FinanceRepository repo, {DateTime? now, bool withImp
   await add('', 15000, monthsAgo(8, 1), 'Sara', EntryKind.expense, loan: sara);
   await add('', 15000, monthsAgo(7, 1), 'Sara', EntryKind.income, loan: sara);
 
+  await _seedBudgets(repo, cats, monthsAgo);
+
   if (withImports) await seedSampleImports(repo, now: today);
+}
+
+/// Monthly budgets, and the regular bills above as recurring payments set
+/// up three months ago, with the entries already logged counted as paid.
+Future<void> _seedBudgets(FinanceRepository repo, Map<String, int> cats, DateTime Function(int, int) monthsAgo) async {
+  await repo.setBudget(null, 300000);
+  for (final (cat, amount) in [
+    ('Groceries', 40000.0),
+    ('Dining out', 15000.0),
+    ('Fuel & transport', 15000.0),
+    ('Shopping', 15000.0),
+    ('Savings deposit', 25000.0),
+    ('Committee (BC)', 20000.0),
+  ]) {
+    await repo.setBudget(cats[cat], amount);
+  }
+  final setUp = monthsAgo(3, 1);
+  for (final (name, cat, amount, day, auto) in [
+    ('House rent', 'Rent', 70000.0, 2, true),
+    ('Netflix', 'Subscriptions', 1500.0, 3, true),
+    ('PTCL Flash fiber', 'Mobile & internet', 4999.0, 4, true),
+    ('School fee', 'Education', 18000.0, 8, false),
+    ('K-Electric', 'Utilities', 17000.0, 10, false),
+  ]) {
+    final r = RecurringPayment(
+        name: name, categoryId: cats[cat]!, amount: amount, currency: 'PKR', startDate: monthsAgo(17, day),
+        autoPost: auto, createdOn: setUp);
+    final id = await repo.saveRecurring(r);
+    final logged = await repo.entries(EntryFilter(preset: DatePreset.custom, range: DateRange(setUp, monthsAgo(0, 31))));
+    for (final due in r.dueDates(setUp, monthsAgo(0, 31))) {
+      final paid = logged.where((e) => e.note == name && e.date.year == due.year && e.date.month == due.month).firstOrNull;
+      if (paid != null) await repo.linkRecurringPost(id, due, paid.id!);
+    }
+  }
 }
 
 /// Puts the sample bank alerts into the import inbox, dated around today,
