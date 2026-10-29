@@ -33,10 +33,11 @@ void main() {
   sqfliteFfiInit();
 
   for (final (tab, dark) in [
-    for (final t in ['Insights', 'Money flow', 'Raast', 'Budget', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
+    for (final t in ['Entries', 'Insights', 'Money flow', 'Raast', 'Budget', 'Assets', 'Gold', 'Loans', 'Reports']) ...[(t, false), (t, true)],
   ]) {
     testWidgets('$tab screenshot ${dark ? 'dark' : 'light'}', skip: _dir == null, (tester) async {
-      tester.view.physicalSize = const Size(1080, 7600);
+      // Entries is a long list; a phone-sized frame shows the summary card in context.
+      tester.view.physicalSize = Size(1080, tab == 'Entries' ? 2340 : 7600);
       tester.view.devicePixelRatio = 2.6;
       tester.platformDispatcher.platformBrightnessTestValue = dark ? Brightness.dark : Brightness.light;
       late AppDatabase db;
@@ -58,7 +59,8 @@ void main() {
       );
       await tester.pumpWidget(scope);
       final container = ProviderScope.containerOf(tester.element(find.byType(KnowFinanceApp)));
-      container.read(filterProvider.notifier).update((f) => f.copyWith(preset: DatePreset.allTime));
+      // Entries keeps the default "This month" so its summary reads like a normal month.
+      if (tab != 'Entries') container.read(filterProvider.notifier).update((f) => f.copyWith(preset: DatePreset.allTime));
       Future<void> settle() async {
         for (var i = 0; i < 8; i++) {
           await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
