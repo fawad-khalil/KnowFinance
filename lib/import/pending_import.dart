@@ -17,6 +17,9 @@ class PendingImport {
     required this.bank,
     required this.raw,
     required this.status,
+    this.counterpartyBank,
+    this.channel,
+    this.minuteOfDay,
   });
 
   final int id;
@@ -29,6 +32,9 @@ class PendingImport {
   final String? bank;
   final String raw;
   final ImportStatus status;
+  final String? counterpartyBank;
+  final PayChannel? channel;
+  final int? minuteOfDay;
 
   static Map<String, Object?> toRow(ParsedTransaction t) => {
         'fingerprint': t.fingerprint,
@@ -40,6 +46,9 @@ class PendingImport {
         'counterparty': t.counterparty,
         'bank': t.bank,
         'raw': t.raw,
+        'counterparty_bank': t.counterpartyBank,
+        'channel': t.channel?.name,
+        'minute_of_day': t.minuteOfDay,
       };
 
   factory PendingImport.fromMap(Map<String, Object?> m) => PendingImport(
@@ -53,5 +62,8 @@ class PendingImport {
         bank: m['bank'] as String?,
         raw: m['raw'] as String,
         status: ImportStatus.values.byName(m['status'] as String),
+        counterpartyBank: m['counterparty_bank'] as String?,
+        channel: PayChannel.fromName(m['channel'] as String?),
+        minuteOfDay: m['minute_of_day'] as int?,
       );
 }

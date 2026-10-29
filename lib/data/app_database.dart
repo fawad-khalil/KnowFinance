@@ -1,6 +1,7 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import '../import/alert_parser.dart';
 import '../models/category.dart';
 import '../models/enums.dart';
 
@@ -66,6 +67,7 @@ class AppDatabase {
     await _createImports(db);
     await _createInvestments(db);
     await _addQuantities(db);
+    await _addPaymentDetails(db);
 
     final batch = db.batch();
     for (final c in defaultCategories) {
@@ -82,8 +84,42 @@ class AppDatabase {
     if (from < 3) await _createInvestments(db);
     if (from < 4) await _addQuantities(db);
     if (from < 5) await _createLoans(db);
-    // Version 6 is taken by the money insights branch.
+    if (from < 6) {
+      await _addPaymentDetails(db);
+      await _backfillPaymentDetails(db);
+    }
     if (from < 7) await _createBudgets(db);
+  }
+
+  /// Which bank, who, their bank, how and when: what money insights group
+  /// by. Imports keep them until accepted, then they move to the entry.
+  static Future<void> _addPaymentDetails(Database db) async {
+    for (final col in ['bank TEXT', "counterparty TEXT NOT NULL DEFAULT ''", 'counterparty_bank TEXT', 'channel TEXT', 'minute_of_day INTEGER']) {
+      await db.execute('ALTER TABLE entries ADD COLUMN $col');
+    }
+    for (final col in ['counterparty_bank TEXT', 'channel TEXT', 'minute_of_day INTEGER']) {
+      await db.execute('ALTER TABLE imports ADD COLUMN $col');
+    }
+  }
+
+  /// Reads the alerts already imported again, so their entries get the new
+  /// details too.
+  static Future<void> _backfillPaymentDetails(Database db) async {
+    const parser = AlertParser();
+    final rows = await db.query('imports', columns: ['id', 'raw', 'source', 'date', 'counterparty', 'bank', 'entry_id']);
+    final batch = db.batch();
+    for (final r in rows) {
+      final t = parser.parse(r['raw'] as String,
+          receivedAt: DateTime.parse(r['date'] as String), source: EntrySource.fromName(r['source'] as String));
+      if (t == null) continue;
+      final details = {'counterparty_bank': t.counterpartyBank, 'channel': t.channel?.name, 'minute_of_day': t.minuteOfDay};
+      batch.update('imports', {...details, 'bank': t.bank ?? r['bank']}, where: 'id = ?', whereArgs: [r['id']]);
+      if (r['entry_id'] != null) {
+        batch.update('entries', {...details, 'bank': t.bank ?? r['bank'], 'counterparty': r['counterparty']},
+            where: 'id = ?', whereArgs: [r['entry_id']]);
+      }
+    }
+    await batch.commit(noResult: true);
   }
 
   /// Monthly budgets, and payments that repeat on a schedule. Each due date

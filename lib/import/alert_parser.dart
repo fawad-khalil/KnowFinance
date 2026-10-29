@@ -31,6 +31,44 @@ class AlertParser {
     'NayaPay': ['NAYAPAY'],
   };
 
+  /// The four-letter bank code inside a Pakistani IBAN (PK36SCBL...).
+  static const _ibanCodes = {
+    'HABB': 'HBL',
+    'MUCB': 'MCB',
+    'UNIL': 'UBL',
+    'MEZN': 'Meezan',
+    'ABPA': 'Allied',
+    'ALFH': 'Bank Alfalah',
+    'BAHL': 'Bank Al Habib',
+    'FAYS': 'Faysal',
+    'SCBL': 'Standard Chartered',
+    'ASCM': 'Askari',
+    'JSBL': 'JS Bank',
+    'NBPA': 'NBP',
+    'JCMA': 'JazzCash',
+    'TMFB': 'Easypaisa',
+    'SADA': 'SadaPay',
+    'NAYA': 'NayaPay',
+  };
+
+  static const _wallets = {'JazzCash', 'Easypaisa', 'SadaPay', 'NayaPay'};
+
+  static final _iban = RegExp(r'\bPK\d{2}([A-Z]{4})', caseSensitive: false);
+
+  /// "at 18:11", "11:36", "7:05 PM". Seconds are ignored.
+  static final _time = RegExp(r'\b([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?(?:\s*([AaPp])\.?[Mm]\b)?');
+
+  /// Where the other side's account details end and the user's begin.
+  static final _counterpartyEnd = RegExp(r'\b(?:your|via|from|on|at|using|thru|through)\b|[;\.](?:\s|$)', caseSensitive: false);
+
+  static final _channels = <(RegExp, PayChannel)>[
+    (RegExp(r'\braast\b', caseSensitive: false), PayChannel.raast),
+    (RegExp(r'\b(atm|cash withdrawal|withdrawn)\b', caseSensitive: false), PayChannel.atm),
+    (RegExp(r'\b(ibft|funds? transfer|inter ?bank)\b', caseSensitive: false), PayChannel.transfer),
+    (RegExp(r'\b(pos|debit card|credit card|card|purchase|charged|charded|paid at|spent at)\b', caseSensitive: false), PayChannel.card),
+    (RegExp(r'\b(sent|received|transferred|transfer)\b', caseSensitive: false), PayChannel.transfer),
+  ];
+
   static const _currencyWords = {
     'PKR': 'PKR',
     'RS': 'PKR',
@@ -127,11 +165,15 @@ class AlertParser {
 
   /// Returns null when the text isn't a completed transaction (OTPs, offers,
   /// reminders, failed payments) or has no amount.
+  ///
+  /// [useReceivedTime] takes the time of day from [receivedAt] when the
+  /// alert has none, for SMS read from the inbox rather than pasted.
   ParsedTransaction? parse(
     String text, {
     String? sender,
     required DateTime receivedAt,
     EntrySource source = EntrySource.sms,
+    bool useReceivedTime = false,
   }) {
     final body = text.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (body.isEmpty || _skipWords.hasMatch(body)) return null;
@@ -152,6 +194,13 @@ class AlertParser {
     final feeMatch = _fee.firstMatch(body.substring(amountMatch.end));
     final fee = feeMatch == null ? null : double.tryParse(feeMatch[1]!.replaceAll(',', ''));
 
+    final who = _merchant(body, kind);
+    final theirs = _counterpartySpan(body, who);
+    final theirBank = theirs == null ? null : _ibanBank(theirs) ?? _bankIn(theirs);
+    // Leave the other side's details out, so "sent to ABC (MBL AC" doesn't
+    // make Meezan the user's own bank.
+    final bank = bankFor(sender, theirs == null ? body : body.replaceFirst(theirs, ' '));
+
     return ParsedTransaction(
       kind: kind,
       amount: kind == EntryKind.expense && fee != null ? amount + fee : amount,
@@ -160,10 +209,60 @@ class AlertParser {
       date: _date(body, receivedAt),
       source: source,
       raw: text.trim(),
-      counterparty: _merchant(body, kind),
-      bank: bankFor(sender, body),
+      counterparty: who,
+      bank: bank,
       balance: balance,
+      counterpartyBank: theirBank,
+      channel: _channel(body, bank),
+      minuteOfDay: _minuteOfDay(body) ?? (useReceivedTime ? receivedAt.hour * 60 + receivedAt.minute : null),
     );
+  }
+
+  /// The counterparty's name and what follows it up to the user's own
+  /// details: "ABC (MBL AC ", "ABC AC#xxxPYMT PK94SCBL888777 as RAAST payment to ".
+  static String? _counterpartySpan(String body, String who) {
+    if (who.isEmpty) return null;
+    final lower = body.toLowerCase();
+    // The name was tidied, so fall back to its first word.
+    var name = who.toLowerCase();
+    var at = lower.indexOf(name);
+    if (at < 0) {
+      name = name.split(' ').first;
+      at = lower.indexOf(name);
+    }
+    if (at < 0) return null;
+    final after = at + name.length;
+    final end = _counterpartyEnd.firstMatch(body.substring(after))?.start ?? body.length - after;
+    final span = body.substring(at, after + end);
+    // Loose names can run on into the user's side ("Sara in your Easypaisa").
+    final yours = RegExp(r'\byour\b', caseSensitive: false).firstMatch(span);
+    return yours == null ? span : span.substring(0, yours.start);
+  }
+
+  static String? _ibanBank(String text) {
+    for (final m in _iban.allMatches(text)) {
+      final bank = _ibanCodes[m[1]!.toUpperCase()];
+      if (bank != null) return bank;
+    }
+    return null;
+  }
+
+  static PayChannel? _channel(String body, String? bank) {
+    for (final (re, channel) in _channels) {
+      if (!re.hasMatch(body)) continue;
+      if (channel == PayChannel.transfer && _wallets.contains(bank)) return PayChannel.wallet;
+      return channel;
+    }
+    return _wallets.contains(bank) ? PayChannel.wallet : null;
+  }
+
+  static int? _minuteOfDay(String body) {
+    final m = _time.firstMatch(body);
+    if (m == null) return null;
+    var hour = int.parse(m[1]!);
+    final half = m[3]?.toLowerCase();
+    if (half != null && hour <= 12) hour = hour % 12 + (half == 'p' ? 12 : 0);
+    return hour * 60 + int.parse(m[2]!);
   }
 
   /// Picks the direction word nearest to the amount, so "PKR 500 sent to
@@ -228,9 +327,15 @@ class AlertParser {
         if (from.isNotEmpty && from.contains(hint.replaceAll(' ', ''))) return entry.key;
       }
     }
+    return _bankIn(text);
+  }
+
+  /// A bank named as a whole word in [text].
+  static String? _bankIn(String text) {
+    final upper = text.toUpperCase();
     for (final entry in _bankHints.entries) {
       for (final hint in entry.value) {
-        if (RegExp('(^|[^A-Z])${RegExp.escape(hint)}([^A-Z]|\$)').hasMatch(text)) return entry.key;
+        if (RegExp('(^|[^A-Z])${RegExp.escape(hint)}([^A-Z]|\$)').hasMatch(upper)) return entry.key;
       }
     }
     return null;

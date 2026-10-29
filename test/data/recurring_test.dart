@@ -78,11 +78,11 @@ void main() {
     expect(await all(), hasLength(1), reason: 'logged entries stay');
   });
 
-  test('upgrades a version 5 database', () async {
-    final path = '${await databaseFactoryFfi.getDatabasesPath()}/v5_upgrade_test.db';
+  test('upgrades a version 6 database', () async {
+    final path = '${await databaseFactoryFfi.getDatabasesPath()}/v6_upgrade_test.db';
     await databaseFactoryFfi.deleteDatabase(path);
     final old = await databaseFactoryFfi.openDatabase(path,
-        options: OpenDatabaseOptions(version: 5, onCreate: (db, _) => db.execute('CREATE TABLE categories (id INTEGER PRIMARY KEY)')));
+        options: OpenDatabaseOptions(version: 6, onCreate: (db, _) => db.execute('CREATE TABLE categories (id INTEGER PRIMARY KEY)')));
     await old.close();
     final upgraded = await AppDatabase.open(factory: databaseFactoryFfi, path: path);
     final tables = await upgraded.db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'");

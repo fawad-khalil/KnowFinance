@@ -41,6 +41,7 @@ class SmsReader {
         sender: m['sender'] as String?,
         receivedAt: DateTime.fromMillisecondsSinceEpoch((m['date'] as num).toInt()),
         source: EntrySource.sms,
+        useReceivedTime: true,
       );
       if (t != null) out.add(t);
     }

@@ -14,6 +14,9 @@ class ParsedTransaction {
     this.bank,
     this.balance,
     this.fee,
+    this.counterpartyBank,
+    this.channel,
+    this.minuteOfDay,
   });
 
   final EntryKind kind;
@@ -33,6 +36,15 @@ class ParsedTransaction {
   /// Bank charge named in the alert ("Fee: Rs.15.00"). Already included in
   /// [amount] for money going out, so the entry matches what left the account.
   final double? fee;
+
+  /// The other side's bank, from an IBAN or a bank named next to their
+  /// account ("ABC (MBL AC", "PK94SCBL...").
+  final String? counterpartyBank;
+  final PayChannel? channel;
+
+  /// Time of day in minutes after midnight: the time in the alert, or when
+  /// the SMS arrived.
+  final int? minuteOfDay;
 
   /// Same message imported twice gives the same fingerprint.
   String get fingerprint =>

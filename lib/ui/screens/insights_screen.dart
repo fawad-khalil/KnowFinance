@@ -12,6 +12,7 @@ import '../widgets/savings_cards.dart';
 import '../widgets/trend_chip.dart';
 import '../widgets/filter_bar.dart';
 import '../widgets/trend_chart.dart';
+import 'money_insights_screen.dart';
 
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
@@ -51,6 +52,7 @@ class InsightsScreen extends ConsumerWidget {
                           style: TextStyle(color: Theme.of(context).colorScheme.error),
                         ),
                       ),
+                    const _MoneyInsightsLink(),
                     const ThisMonthCard(),
                     const SavingsHistoryCard(),
                     const SizedBox(height: 12),
@@ -125,6 +127,40 @@ class InsightsScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Opens money patterns: senders, banks, spending pace and Raast.
+class _MoneyInsightsLink extends StatelessWidget {
+  const _MoneyInsightsLink();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
+      color: theme.colorScheme.secondaryContainer,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const MoneyInsightsScreen())),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Icon(Icons.auto_awesome_outlined, color: theme.colorScheme.onSecondaryContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Money patterns',
+                    style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSecondaryContainer)),
+                Text('Last 30 days of senders, banks, spending pace and Raast',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSecondaryContainer)),
+              ]),
+            ),
+            Icon(Icons.chevron_right, color: theme.colorScheme.onSecondaryContainer),
+          ]),
+        ),
       ),
     );
   }
