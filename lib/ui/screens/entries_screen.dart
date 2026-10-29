@@ -7,6 +7,7 @@ import '../../models/entry.dart';
 import '../../models/enums.dart';
 import '../../state/providers.dart';
 import '../widgets/filter_bar.dart';
+import '../widgets/period_summary_card.dart';
 import 'entry_form_screen.dart';
 import 'import_screen.dart';
 
@@ -83,14 +84,14 @@ class _EntryList extends ConsumerWidget {
   }
 }
 
-class _Summary extends StatelessWidget {
+class _Summary extends ConsumerWidget {
   const _Summary({required this.entries, required this.home});
 
   final List<Entry> entries;
   final String home;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     var income = 0.0, expense = 0.0, missing = 0;
     var loansIn = 0.0, loansOut = 0.0;
     for (final e in entries) {
@@ -110,48 +111,14 @@ class _Summary extends StatelessWidget {
         expense += amt;
       }
     }
-    final theme = Theme.of(context);
-    Widget cell(String label, double v, Color? color) => Expanded(
-          child: Column(
-            children: [
-              Text(label, style: theme.textTheme.labelMedium),
-              const SizedBox(height: 4),
-              FittedBox(
-                child: Text(formatMoney(v, home),
-                    style: theme.textTheme.titleMedium?.copyWith(color: color, fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-        );
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(children: [
-              cell('Income', income, Colors.green.shade600),
-              cell('Expenses', expense, theme.colorScheme.error),
-              cell('Net', income - expense, null),
-            ]),
-            if (loansIn > 0 || loansOut > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Loans, not counted above: ${formatMoney(loansIn, home)} in, ${formatMoney(loansOut, home)} out',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ],
-            if (missing > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                '$missing ${missing == 1 ? 'entry needs' : 'entries need'} an exchange rate and '
-                '${missing == 1 ? "isn't" : "aren't"} counted.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return PeriodSummaryCard(
+      income: income,
+      expense: expense,
+      loansIn: loansIn,
+      loansOut: loansOut,
+      missing: missing,
+      home: home,
+      label: leftLabel(ref.watch(filterProvider.select((f) => f.preset))),
     );
   }
 }
